@@ -1,0 +1,17 @@
+.DS_Store
+
+# Xcode
+DerivedData/
+build/
+*.xcworkspace/xcuserdata/
+*.xcuserdatad/
+*.xcuserstate
+
+# Swift Package Manager
+.build/
+Package.resolved
+
+# Local runtime assets
+models/
+artifacts/
+tmp/
