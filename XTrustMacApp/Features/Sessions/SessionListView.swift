@@ -27,51 +27,33 @@ struct SessionListView: View {
                     ContentUnavailableView(
                         "No Sessions Yet",
                         systemImage: "waveform.badge.plus",
-                        description: Text("Create an empty local session to verify workspace setup.")
+                        description: Text("Select \"New Session\" above to start.")
                     )
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("New Session") {
+                        appState.createSession()
+                    }
                 }
             }
         } detail: {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text("Local Sessions")
-                        .font(.largeTitle)
-                        .fontWeight(.semibold)
-
-                    Button("New Session") {
-                        appState.createSession()
-                    }
-                    .buttonStyle(.borderedProminent)
-
-                    HStack(spacing: 12) {
-                        Button("Start Recording") {
-                            Task {
-                                await appState.startRecording()
-                            }
+                    SessionDetailView(
+                        detail: appState.selectedSessionDetail,
+                        isListening: appState.isListening,
+                        isSpeechActive: appState.isSpeechActive,
+                        audioLevel: appState.audioLevel,
+                        onStartListening: {
+                            Task { await appState.startListening() }
+                        },
+                        onStopListening: { appState.stopListening() },
+                        onTranscribeUtterance: { utteranceID in
+                            Task { await appState.transcribeUtterance(utteranceID: utteranceID) }
                         }
-                        .buttonStyle(.bordered)
-                        .disabled(appState.isRecording)
-
-                        Button("Stop Recording") {
-                            Task {
-                                await appState.stopRecording()
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(!appState.isRecording)
-                    }
-
-                SessionDetailView(
-                    detail: appState.selectedSessionDetail,
-                    isPlaying: appState.isPlayingSelectedSession,
-                    onTogglePlayback: { appState.togglePlaybackForSelectedSession() },
-                    onStopPlayback: { appState.stopPlayback() },
-                    onTranscribe: {
-                        Task {
-                            await appState.transcribeSelectedSession()
-                        }
-                    }
-                )
+                    )
 
                     Divider()
 

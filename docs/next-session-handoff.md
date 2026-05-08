@@ -4,74 +4,95 @@ Date: 2026-05-08 JST
 
 ## Current decision
 
-Whisper transcription now runs through a persisted `TranscriptionJob` runner
-with isolated job workspaces, and the UI reads that durable state.
+Phase 6 (topic formation) is complete. The app now groups utterances into
+topics automatically using the 60-second silence-gap rule.
 
-What this proved:
+## What was completed this session
 
-- session creation works
-- microphone recording works
-- playback works
-- Whisper model discovery works
-- `ffmpeg` resolution from the app process works
-- transcript output can be produced under the local workspace
-- one transcription attempt becomes one persisted `TranscriptionJob`
-- Whisper output is isolated under `jobs/transcription/<job_id>/`
-- stdout, stderr, exit code, and generated files are retained as job evidence
-- validated transcript output is promoted into final `transcripts/`
-- retry creates a new job attempt instead of overwriting prior state
-- `Session Detail` can survive restart and still show job state and attempts
+### Phase 6 (complete)
 
-What this did not change:
+- `TopicAssignmentService.swift` — new service in `AppCore/Application/`
+  - Dependencies: `TopicStore`, `UtteranceStore`
+  - Rule: if `utterance.startedAt - previousUtterance.endedAt >= 60s`,
+    close the active topic (status → completed, endedAt set) and open a new
+    topic
+  - `assignTopic(to:)` inserts or finds a topic, updates the utterance's
+    `topicID` in the store, and returns the assigned topic
+  - Defensive fallback: if no active topic exists despite gap < 60s, creates
+    a new topic
+- `CaptureRuntime.swift` — injected `TopicAssignmentService`; calls
+  `assignTopic` after `persistUtterance` in `handleEvent`; topic assignment
+  errors surface via `onError` without suppressing `onUtteranceCreated`
+- `AppRuntime.swift` — constructs `TopicAssignmentService` and injects into
+  `CaptureRuntime`
+- `AppState.swift` — `SessionPersistenceStore` now includes `TopicStore`;
+  `SessionDetailSnapshot` now holds `topics: [Topic]`;
+  `refreshSelectedSessionDetail` loads topics from the store
+- `SessionDetailView.swift` — refactored `utterancesSection` into
+  `topicHeaderView`, `utteranceList`, and `utteranceCard` helpers; utterances
+  are grouped under "Topic N — HH:MM:SS" headers; active topics show a green
+  "active" badge; utterances with no `topicID` appear before any topic groups
+  for backward compatibility with old sessions
+- `TopicAssignmentServiceTests.swift` — 3 new tests:
+  - `firstUtteranceCreatesNewTopic`
+  - `utteranceWithin60sStaysInSameTopic`
+  - `utteranceAfter60sGapCreatesNewTopicAndClosesPrior`
 
-- the current recording path still materializes one utterance from the session-
-  level recording scaffold
-- the app is not yet doing continuous listening, VAD, or automatic utterance
-  creation
-- transcript artifact history is not yet shown per attempt
-- topics and summaries still do not exist in the runtime path
+## Current state of the app
 
-## What to carry forward
+Working flow:
+1. Left column → "New Session" → session created and selected
+2. "Start" → VAD capture begins for the selected session
+3. Speak → silence 3s → Utterance + RecordingArtifact persisted → topic
+   assigned automatically → utterance card appears under "Topic N" header
+4. Speak again within 60s → same topic
+5. Gap of 60s or more → new topic header appears for next utterances
+6. "Transcribe" button per utterance → TranscriptionJobRunner runs Whisper
+7. Transcript text appears in the utterance card
 
-The next session should start from:
+Status:
+- `swift test` — 14 tests pass (3 new in TopicAssignmentServiceTests)
+- `xcodebuild ... build` — BUILD SUCCEEDED
+- Manual flow confirmed end-to-end
+
+## What has not changed
+
+- No VAD threshold tuning; `speechRMSThreshold = 0.01` may need adjustment
+  for noisy environments (AC noise, keyboard, etc.)
+- The old `MicrophoneRecorder` one-shot recording path remains in `AppState`
+  (`startRecording` / `stopRecording`) but has no UI buttons; it is dead code
+  in the current product flow
+- `WhisperTranscriber.swift` and `MicrophoneRecorder.swift` in `Shared/` are
+  retained but no longer on the primary product path
+- Topic summarization is not yet implemented (Phase 7)
+
+## Open questions for next session
+
+1. VAD threshold tuning: is `speechRMSThreshold = 0.01` appropriate for the
+   target recording environment?
+2. After verifying topic formation in practice, should the dead
+   `MicrophoneRecorder` one-shot path be removed?
+3. Phase 7 scope: topic summarization before or after session close?
+
+## First task for next session: Phase 7 (topic summary and session close)
+
+Suggested scope based on `docs/implementation-plan.md`:
+
+1. Topic summary job model and local LLM adapter port
+2. Per-topic "Summarize" trigger in the UI (manual, not automatic yet)
+3. Explicit session close action
+4. Session-level export or wrap-up text
+
+Infrastructure available:
+- `Topic.summaryText`, `Topic.summaryStatus`, `Topic.summaryError` already
+  defined in the domain model
+- `TopicStore.updateTopic` already available
+- `TranscriptionJobRunner` pattern can be reused for a summary job runner
+
+## Key documents
 
 - `docs/product-requirements.md`
 - `docs/milestones.md`
 - `docs/design-reset.md`
 - `docs/implementation-plan.md`
 - `docs/architecture.md`
-
-## What not to do first
-
-Do not resume with:
-
-- more point fixes in old session-level transcription fields
-- topic or summary work before utterance capture is reliable
-- cosmetic UI polish before the remaining durable state is visible
-
-Those are secondary until the product path is fixed.
-
-## First discussion for the next session
-
-The first task in the next session should be to confirm:
-
-1. how transcript artifacts should be shown per job attempt
-2. which remaining session-level transcription fields can now be removed or
-   downgraded to migration scaffolding
-3. the exact manual verification checklist for retry history and restart
-   persistence
-4. where the capture runtime split should start:
-   microphone monitor, VAD boundary detector, or utterance recorder
-5. the retention policy for successful job diagnostics and raw audio artifacts
-
-## Recommended restart point
-
-Restart from the remaining Phase 4 cleanup, not from more ad hoc button-path
-fixes.
-
-Recommended restart sequence:
-
-- first add transcript artifact history per job attempt
-- then reduce the remaining session-level transcription scaffolding
-- then lock in manual restart and retry verification
-- only after that resume capture runtime split, VAD, and utterance generation

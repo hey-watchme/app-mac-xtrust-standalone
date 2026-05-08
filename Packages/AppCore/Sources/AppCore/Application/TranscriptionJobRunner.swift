@@ -31,6 +31,7 @@ public struct TranscriptionJobRunner: Sendable {
         self.clock = clock
     }
 
+    @discardableResult
     public func run(
         utteranceID: UUID,
         recordingArtifact: RecordingArtifactMetadata

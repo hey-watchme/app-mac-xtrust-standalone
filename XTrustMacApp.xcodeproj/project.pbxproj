@@ -16,6 +16,7 @@
 		91A9FABEC61732FA26E32687 /* DiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C87E0546F37CE687A12C03E5 /* DiagnosticsView.swift */; };
 		A331C9F5F14ABA02589E17ED /* AppCore in Frameworks */ = {isa = PBXBuildFile; productRef = 16559683B08FCD35730BF90D /* AppCore */; };
 		A3F17FB9D470216B2E545CA9 /* CopyableDetailRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B717838272D4016CA9091B5 /* CopyableDetailRow.swift */; };
+		B14F16B0C1FECD7144E2360E /* AVAudioCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD590FC1C81A0DA1FA3DCB16 /* AVAudioCaptureController.swift */; };
 		B187579E2D50942C02920D13 /* SessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A039DEEAD8BA719205DF34E6 /* SessionDetailView.swift */; };
 		C50C6FD5BB908566CD52FB47 /* AppRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE57E48760C5E12FE75244C1 /* AppRuntime.swift */; };
 		CF8906C4E9E105CE115CA3A5 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3556079B74CE405811406122 /* AppDelegate.swift */; };
@@ -36,6 +37,7 @@
 		9A262A19F49CB88682E84D0E /* AppDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiagnostics.swift; sourceTree = "<group>"; };
 		A039DEEAD8BA719205DF34E6 /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
 		AA322B047B4588EAC739AAC5 /* AudioPlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaybackController.swift; sourceTree = "<group>"; };
+		BD590FC1C81A0DA1FA3DCB16 /* AVAudioCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVAudioCaptureController.swift; sourceTree = "<group>"; };
 		C87E0546F37CE687A12C03E5 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
 		CE57E48760C5E12FE75244C1 /* AppRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntime.swift; sourceTree = "<group>"; };
 		D3211A8FB80887592033D556 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
@@ -126,6 +128,7 @@
 			children = (
 				0BD655090BEE7DF2EB7611B1 /* .gitkeep */,
 				AA322B047B4588EAC739AAC5 /* AudioPlaybackController.swift */,
+				BD590FC1C81A0DA1FA3DCB16 /* AVAudioCaptureController.swift */,
 				1B717838272D4016CA9091B5 /* CopyableDetailRow.swift */,
 				C87E0546F37CE687A12C03E5 /* DiagnosticsView.swift */,
 				EC877D5F1F438AFC5A5F45AC /* MicrophoneRecorder.swift */,
@@ -207,6 +210,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B14F16B0C1FECD7144E2360E /* AVAudioCaptureController.swift in Sources */,
 				CF8906C4E9E105CE115CA3A5 /* AppDelegate.swift in Sources */,
 				67930E7B9AA67AC250C7ED7E /* AppDiagnostics.swift in Sources */,
 				C50C6FD5BB908566CD52FB47 /* AppRuntime.swift in Sources */,

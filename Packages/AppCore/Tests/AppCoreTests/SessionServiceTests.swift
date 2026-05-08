@@ -47,36 +47,6 @@ struct SessionServiceTests {
         #expect(try store.listSessions().count == 2)
     }
 
-    @Test
-    func marksTranscriptionLifecycle() throws {
-        let session = Session(
-            id: UUID(uuidString: "00000000-0000-0000-0000-000000000012")!,
-            startedAt: Date(timeIntervalSince1970: 1_700_000_000),
-            endedAt: Date(timeIntervalSince1970: 1_700_000_005),
-            status: .completed,
-            audioFilePath: "/tmp/test.wav",
-            durationSeconds: 5
-        )
-        let store = SessionServiceInMemoryStore(initialSessions: [session])
-        let service = SessionService(
-            sessionStore: store,
-            clock: SessionServiceFixedClock(now: Date(timeIntervalSince1970: 1_700_000_123))
-        )
-
-        let running = try service.markTranscriptionStarted(session: session)
-        let completed = try service.markTranscriptionCompleted(
-            session: running,
-            transcriptText: "こんにちは",
-            transcriptFilePath: "/tmp/test.txt",
-            durationSeconds: 2.4
-        )
-
-        #expect(running.transcriptionStatus == .running)
-        #expect(completed.transcriptionStatus == .completed)
-        #expect(completed.transcriptText == "こんにちは")
-        #expect(completed.transcriptFilePath == "/tmp/test.txt")
-        #expect(completed.transcriptionDurationSeconds == 2.4)
-    }
 }
 
 private final class SessionServiceInMemoryStore: SessionStore, @unchecked Sendable {

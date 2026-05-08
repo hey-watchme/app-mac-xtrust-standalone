@@ -10,6 +10,7 @@ struct AppRuntime {
     let audioPlaybackController: AudioPlaybackController
     let whisperTranscriber: WhisperCLITranscriber
     let transcriptionJobRunner: TranscriptionJobRunner
+    let captureRuntime: CaptureRuntime
     let initialSessions: [Session]
     let diagnostics: AppDiagnostics
 
@@ -35,6 +36,17 @@ struct AppRuntime {
             transcriber: whisperTranscriber,
             clock: SystemClock()
         )
+        let topicAssignmentService = TopicAssignmentService(
+            topicStore: sessionStore,
+            utteranceStore: sessionStore
+        )
+        let captureRuntime = CaptureRuntime(
+            captureController: AVAudioCaptureController(),
+            utteranceStore: sessionStore,
+            recordingArtifactStore: sessionStore,
+            clock: SystemClock(),
+            topicAssignmentService: topicAssignmentService
+        )
 
         try sessionStore.initialize()
         let sessions = try sessionService.loadSessions()
@@ -47,6 +59,7 @@ struct AppRuntime {
             audioPlaybackController: audioPlaybackController,
             whisperTranscriber: whisperTranscriber,
             transcriptionJobRunner: transcriptionJobRunner,
+            captureRuntime: captureRuntime,
             initialSessions: sessions,
             diagnostics: AppDiagnostics(
                 paths: paths,

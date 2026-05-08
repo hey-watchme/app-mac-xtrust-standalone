@@ -53,33 +53,4 @@ public struct SessionService: Sendable {
         return updatedSession
     }
 
-    public func markTranscriptionStarted(session: Session) throws -> Session {
-        let updatedSession = session.transcriptionStarted()
-        try sessionStore.updateSession(updatedSession)
-        return updatedSession
-    }
-
-    public func markTranscriptionCompleted(
-        session: Session,
-        transcriptText: String,
-        transcriptFilePath: String,
-        durationSeconds: Double
-    ) throws -> Session {
-        let updatedSession = session.transcriptionCompleted(
-            transcriptText: transcriptText,
-            transcriptFilePath: transcriptFilePath,
-            durationSeconds: durationSeconds
-        )
-        try sessionStore.updateSession(updatedSession)
-        return updatedSession
-    }
-
-    public func markTranscriptionFailed(
-        session: Session,
-        message: String
-    ) throws -> Session {
-        let updatedSession = session.transcriptionFailed(message: message)
-        try sessionStore.updateSession(updatedSession)
-        return updatedSession
-    }
 }

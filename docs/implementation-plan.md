@@ -217,17 +217,12 @@ Exit criteria:
 
 ## Immediate next code task
 
-The main line is now the persisted `TranscriptionJob` runner and the first
-operator-visible job UI.
+Phase 6 (topic formation) is complete. Utterances are now grouped into topics
+automatically using the 60-second silence-gap rule.
 
-Complete the remaining Phase 4 work before starting capture runtime split:
+Phase 7 (topic summary and session close) is next:
 
-1. show transcript artifact history per transcription attempt, not only the
-   latest artifact
-2. reduce remaining session-level transcription fields so the UI depends more
-   directly on utterance-owned durable state
-3. harden the manual verification checklist for restart persistence, retry
-   history, and diagnostics retention
-4. once those are stable, start Phase 5 by splitting microphone monitoring,
-   VAD boundary detection, and utterance recording into separate runtime
-   responsibilities
+1. define a topic summary job model and local LLM adapter port
+2. implement a per-topic "Summarize" trigger (manual first, automatic later)
+3. add an explicit session close action
+4. add a session-level export or wrap-up representation

@@ -6,6 +6,7 @@ import Foundation
 final class AppState: ObservableObject {
     typealias SessionPersistenceStore =
         RecordingArtifactStore &
+        TopicStore &
         UtteranceStore &
         TranscriptionJobStore &
         TranscriptArtifactStore
@@ -17,6 +18,7 @@ final class AppState: ObservableObject {
     let audioPlaybackController: AudioPlaybackController
     let whisperTranscriber: WhisperCLITranscriber
     let transcriptionJobRunner: TranscriptionJobRunner
+    let captureRuntime: CaptureRuntime
     private var transcriptionRefreshTask: Task<Void, Never>?
     @Published var selectedSessionID: Session.ID?
     @Published var activeRecordingSessionID: Session.ID?
@@ -25,6 +27,8 @@ final class AppState: ObservableObject {
     @Published var selectedSessionDetail: SessionDetailSnapshot?
     @Published var diagnostics: AppDiagnostics
     @Published var errorMessage: String?
+    @Published var audioLevel: Float = 0
+    @Published var isSpeechActive: Bool = false
 
     static func bootstrap() throws -> AppState {
         let runtime = try AppRuntime.bootstrap()
@@ -36,6 +40,7 @@ final class AppState: ObservableObject {
             audioPlaybackController: runtime.audioPlaybackController,
             whisperTranscriber: runtime.whisperTranscriber,
             transcriptionJobRunner: runtime.transcriptionJobRunner,
+            captureRuntime: runtime.captureRuntime,
             selectedSessionID: runtime.initialSessions.first?.id,
             activeRecordingSessionID: nil,
             activePlaybackFilePath: nil,
@@ -54,6 +59,7 @@ final class AppState: ObservableObject {
         audioPlaybackController: AudioPlaybackController,
         whisperTranscriber: WhisperCLITranscriber,
         transcriptionJobRunner: TranscriptionJobRunner,
+        captureRuntime: CaptureRuntime,
         selectedSessionID: Session.ID?,
         activeRecordingSessionID: Session.ID?,
         activePlaybackFilePath: String?,
@@ -69,6 +75,7 @@ final class AppState: ObservableObject {
         self.audioPlaybackController = audioPlaybackController
         self.whisperTranscriber = whisperTranscriber
         self.transcriptionJobRunner = transcriptionJobRunner
+        self.captureRuntime = captureRuntime
         self.selectedSessionID = selectedSessionID
         self.activeRecordingSessionID = activeRecordingSessionID
         self.activePlaybackFilePath = activePlaybackFilePath
@@ -78,6 +85,18 @@ final class AppState: ObservableObject {
         self.errorMessage = errorMessage
         self.audioPlaybackController.onPlaybackStopped = { [weak self] in
             self?.activePlaybackFilePath = nil
+        }
+        captureRuntime.onUtteranceCreated = { [weak self] _, _ in
+            self?.refreshSelectedSessionDetail()
+        }
+        captureRuntime.onSpeechStateChanged = { [weak self] active in
+            self?.isSpeechActive = active
+        }
+        captureRuntime.onLevelUpdated = { [weak self] level in
+            self?.audioLevel = level
+        }
+        captureRuntime.onError = { [weak self] error in
+            self?.errorMessage = error.localizedDescription
         }
         refreshSelectedSessionDetail()
     }
@@ -170,40 +189,72 @@ final class AppState: ObservableObject {
         return activePlaybackFilePath == filePath && audioPlaybackController.isPlaying
     }
 
+    var isListening: Bool { captureRuntime.isCapturing }
+
+    func startListening() async {
+        do {
+            guard let sessionID = selectedSessionID else { return }
+            guard await microphoneRecorder.requestPermission() else {
+                throw MicrophoneRecorderError.permissionDenied
+            }
+            try captureRuntime.startCapture(
+                sessionID: sessionID,
+                utteranceOutputDirectory: paths.audio
+            )
+            errorMessage = nil
+            refreshDiagnostics()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func stopListening() {
+        captureRuntime.stopCapture()
+        audioLevel = 0
+        isSpeechActive = false
+        refreshDiagnostics()
+    }
+
+    func transcribeUtterance(utteranceID: UUID) async {
+        guard let sessionID = selectedSessionID,
+              let utteranceDetail = selectedSessionDetail?.utterances.first(where: { $0.utterance.id == utteranceID }),
+              let artifact = utteranceDetail.latestRecordingArtifact else {
+            errorMessage = "No recording artifact found for this utterance."
+            return
+        }
+        do {
+            errorMessage = nil
+            startTranscriptionRefreshLoop(selecting: sessionID)
+            defer { stopTranscriptionRefreshLoop() }
+            try await transcriptionJobRunner.run(
+                utteranceID: utteranceID,
+                recordingArtifact: artifact
+            )
+            try reloadSessions(selecting: sessionID)
+        } catch {
+            try? reloadSessions(selecting: sessionID)
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func transcribeSelectedSession() async {
         do {
             guard let session = selectedSession, let audioFilePath = session.audioFilePath else { return }
             let utteranceContext = try ensureTranscriptionContext(for: session, audioFilePath: audioFilePath)
 
-            let runningSession = try sessionService.markTranscriptionStarted(session: session)
-            try reloadSessions(selecting: session.id)
             errorMessage = nil
             startTranscriptionRefreshLoop(selecting: session.id)
             defer { stopTranscriptionRefreshLoop() }
 
-            let result = try await transcriptionJobRunner.run(
+            try await transcriptionJobRunner.run(
                 utteranceID: utteranceContext.utterance.id,
                 recordingArtifact: utteranceContext.recordingArtifact
             )
 
-            let completedSession = try sessionService.markTranscriptionCompleted(
-                session: runningSession,
-                transcriptText: result.transcriptArtifact.text,
-                transcriptFilePath: result.transcriptArtifact.filePath,
-                durationSeconds: durationSeconds(for: result.job)
-            )
-            try reloadSessions(selecting: completedSession.id)
+            try reloadSessions(selecting: session.id)
         } catch {
-            do {
-                if let session = selectedSession {
-                    let failedSession = try sessionService.markTranscriptionFailed(
-                        session: session,
-                        message: error.localizedDescription
-                    )
-                    try reloadSessions(selecting: failedSession.id)
-                }
-            } catch {
-                errorMessage = error.localizedDescription
+            if let session = selectedSession {
+                try? reloadSessions(selecting: session.id)
             }
             errorMessage = error.localizedDescription
         }
@@ -349,13 +400,6 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func durationSeconds(for job: TranscriptionJob) -> Double {
-        guard let startedAt = job.startedAt, let endedAt = job.endedAt else {
-            return 0
-        }
-        return endedAt.timeIntervalSince(startedAt)
-    }
-
     private func refreshSelectedSessionDetail() {
         guard let session = selectedSession else {
             selectedSessionDetail = nil
@@ -363,6 +407,7 @@ final class AppState: ObservableObject {
         }
 
         do {
+            let topics = try persistenceStore.listTopics(sessionID: session.id)
             let utterances = try persistenceStore.listUtterances(sessionID: session.id)
             let utteranceDetails = try utterances.map { utterance in
                 let recordingArtifacts = try persistenceStore.listRecordingArtifacts(utteranceID: utterance.id)
@@ -380,6 +425,7 @@ final class AppState: ObservableObject {
 
             selectedSessionDetail = SessionDetailSnapshot(
                 session: session,
+                topics: topics,
                 utterances: utteranceDetails.sorted { $0.utterance.startedAt < $1.utterance.startedAt }
             )
         } catch {
@@ -407,6 +453,7 @@ private struct SessionTranscriptionContext {
 
 struct SessionDetailSnapshot {
     let session: Session
+    let topics: [Topic]
     let utterances: [UtteranceDetailSnapshot]
 }
 
