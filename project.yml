@@ -1,0 +1,29 @@
+name: XTrustMacApp
+options:
+  minimumXcodeGenVersion: 2.45.4
+  createIntermediateGroups: true
+packages:
+  AppCore:
+    path: Packages/AppCore
+targets:
+  XTrustMacApp:
+    type: application
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: XTrustMacApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.xtrust.mac-local-first
+        PRODUCT_NAME: XTrustMacApp
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: Record meeting audio locally on this Mac.
+        SWIFT_VERSION: 6.0
+        MACOSX_DEPLOYMENT_TARGET: 15.0
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+    dependencies:
+      - package: AppCore
+        product: AppCore
+    scheme:
+      testTargets: []

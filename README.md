@@ -8,11 +8,20 @@ infrastructure.
 
 ## Current status
 
-This project is in planning bootstrap.
+This project now has a Milestone 1 scaffold:
+
+- a real macOS Xcode project at `XTrustMacApp.xcodeproj`
+- a minimal macOS `SwiftUI` app target at `XTrustMacApp/`
+- a testable core library as a local package at `Packages/AppCore/`
+- baseline unit and integration tests for workspace bootstrap and session
+  persistence
 
 Technical stack and implementation planning are tracked in:
 
+- `docs/architecture.md`
 - `docs/tech-stack-plan.md`
+- `docs/milestones.md`
+- `docs/testing-strategy.md`
 
 ## Why this project exists
 
@@ -140,14 +149,78 @@ Do not start with:
 
 ```text
 mac-local-first/
+├── Package.swift
+├── XTrustMacApp.xcodeproj
+├── project.yml
+├── XTrustMacApp/
+├── Packages/
+├── Tests/
+├── Fixtures/
+├── ThirdParty/
+├── scripts/
 ├── README.md
 └── docs/
-    └── tech-stack-plan.md
+    ├── architecture.md
+    ├── tech-stack-plan.md
+    ├── milestones.md
+    └── testing-strategy.md
 ```
+
+## Current status
+
+Implemented so far:
+
+- app launch from `XTrustMacApp.xcodeproj`
+- local workspace bootstrap under `~/Library/Application Support/XTrust/com.xtrust.mac-local-first/`
+- local SQLite session store
+- `New Session` creation and relaunch persistence
+- microphone recording to local `wav`
+- local playback of recorded audio
+- manual file-based ASR trigger through the Python `whisper` CLI
+
+Current verification:
+
+- `swift build`
+- `swift test`
+- `xcodebuild -project XTrustMacApp.xcodeproj -scheme XTrustMacApp build`
+
+Open in Xcode:
+
+1. Open `XTrustMacApp.xcodeproj` in Xcode.
+2. Select the `XTrustMacApp` scheme.
+3. Run the app on `My Mac`.
+
+Note:
+
+- use `XTrustMacApp.xcodeproj` for running the app
+- keep `Package.swift` for command-line build and test workflows only
+
+## ASR prerequisite
+
+The current Milestone 3 path uses the locally installed Python `whisper` CLI.
+
+The app does not download Whisper models at runtime. This is intentional, so
+ASR does not depend on live network access or local SSL trust settings.
+
+Place the model file here before pressing `Transcribe Recording`:
+
+- `~/Library/Application Support/XTrust/com.xtrust.mac-local-first/models/whisper/small.pt`
+
+You can confirm the exact path in the app under `Diagnostics`:
+
+- `Whisper Model`
+- `Whisper Model Ready`
+
+If the file is missing, ASR will fail with a direct local-path error instead of
+trying to download the model.
 
 ## Recommended next step
 
-1. Fix the v1 tech stack and process model.
-2. Decide the local model formats and storage paths.
-3. Create the macOS app shell.
-4. Prove `record -> transcribe -> summarize -> save`.
+Implementation is currently paused pending a product reset.
+
+Before the next coding session, use these documents as the source of truth:
+
+- `docs/product-requirements.md`
+- `docs/milestones.md`
+- `docs/architecture.md`
+- `docs/next-session-handoff.md`

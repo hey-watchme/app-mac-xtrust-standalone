@@ -1,0 +1,425 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1FA48225782CC8ABBA9C452C /* AudioPlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA322B047B4588EAC739AAC5 /* AudioPlaybackController.swift */; };
+		3A3FF778EAB67D5BB2F2BAF9 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 543D897CB093CF85ACFB0C15 /* AppState.swift */; };
+		42154AEA24A9331017A0E85E /* MicrophoneRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC877D5F1F438AFC5A5F45AC /* MicrophoneRecorder.swift */; };
+		55F615E295737644A740FAC8 /* XTrustMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A49548DD7BC0427330E618 /* XTrustMacApp.swift */; };
+		67930E7B9AA67AC250C7ED7E /* AppDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A262A19F49CB88682E84D0E /* AppDiagnostics.swift */; };
+		79B9BA207CF3562ABB74B287 /* SessionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BFEC83FD81FE76DA1667151 /* SessionListView.swift */; };
+		91A9FABEC61732FA26E32687 /* DiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C87E0546F37CE687A12C03E5 /* DiagnosticsView.swift */; };
+		A331C9F5F14ABA02589E17ED /* AppCore in Frameworks */ = {isa = PBXBuildFile; productRef = 16559683B08FCD35730BF90D /* AppCore */; };
+		A3F17FB9D470216B2E545CA9 /* CopyableDetailRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B717838272D4016CA9091B5 /* CopyableDetailRow.swift */; };
+		B187579E2D50942C02920D13 /* SessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A039DEEAD8BA719205DF34E6 /* SessionDetailView.swift */; };
+		C50C6FD5BB908566CD52FB47 /* AppRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE57E48760C5E12FE75244C1 /* AppRuntime.swift */; };
+		CF8906C4E9E105CE115CA3A5 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3556079B74CE405811406122 /* AppDelegate.swift */; };
+		EBCDFF256F40B9D72F47E2F6 /* WhisperTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6432B9AEAE14BE6F8FDE43A8 /* WhisperTranscriber.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0B8203599318178CFC0FE23E /* AppCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AppCore; path = Packages/AppCore; sourceTree = SOURCE_ROOT; };
+		0BD655090BEE7DF2EB7611B1 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
+		1B717838272D4016CA9091B5 /* CopyableDetailRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyableDetailRow.swift; sourceTree = "<group>"; };
+		3556079B74CE405811406122 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		3BFEC83FD81FE76DA1667151 /* SessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListView.swift; sourceTree = "<group>"; };
+		43DB9155B0668067122FED0D /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
+		4C8DF5CE8FDA201EC2E3DC06 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
+		543D897CB093CF85ACFB0C15 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		6432B9AEAE14BE6F8FDE43A8 /* WhisperTranscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperTranscriber.swift; sourceTree = "<group>"; };
+		89A49548DD7BC0427330E618 /* XTrustMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XTrustMacApp.swift; sourceTree = "<group>"; };
+		9A262A19F49CB88682E84D0E /* AppDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiagnostics.swift; sourceTree = "<group>"; };
+		A039DEEAD8BA719205DF34E6 /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
+		AA322B047B4588EAC739AAC5 /* AudioPlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaybackController.swift; sourceTree = "<group>"; };
+		C87E0546F37CE687A12C03E5 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
+		CE57E48760C5E12FE75244C1 /* AppRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntime.swift; sourceTree = "<group>"; };
+		D3211A8FB80887592033D556 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
+		EC877D5F1F438AFC5A5F45AC /* MicrophoneRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneRecorder.swift; sourceTree = "<group>"; };
+		ED547DCBCF6CC917E2B8427E /* XTrustMacApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XTrustMacApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		9DBF4A6915DCE9A745EC970B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A331C9F5F14ABA02589E17ED /* AppCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1082A7B8065FBCA1833882D5 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				4C8DF5CE8FDA201EC2E3DC06 /* .gitkeep */,
+				3556079B74CE405811406122 /* AppDelegate.swift */,
+				9A262A19F49CB88682E84D0E /* AppDiagnostics.swift */,
+				CE57E48760C5E12FE75244C1 /* AppRuntime.swift */,
+				543D897CB093CF85ACFB0C15 /* AppState.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		143FFAE2B030713948BFBAB7 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				D3211A8FB80887592033D556 /* .gitkeep */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		292EF4AC68EB759D6E71D1EE /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				ED547DCBCF6CC917E2B8427E /* XTrustMacApp.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		732B56C6EDD12B5CA3380717 /* Sessions */ = {
+			isa = PBXGroup;
+			children = (
+				A039DEEAD8BA719205DF34E6 /* SessionDetailView.swift */,
+				3BFEC83FD81FE76DA1667151 /* SessionListView.swift */,
+			);
+			path = Sessions;
+			sourceTree = "<group>";
+		};
+		B048EF2420E08954A1243A46 = {
+			isa = PBXGroup;
+			children = (
+				D128512FFDF2D7BF341FDC53 /* Packages */,
+				C629066DBF5D74FB771BAC7A /* XTrustMacApp */,
+				292EF4AC68EB759D6E71D1EE /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C629066DBF5D74FB771BAC7A /* XTrustMacApp */ = {
+			isa = PBXGroup;
+			children = (
+				89A49548DD7BC0427330E618 /* XTrustMacApp.swift */,
+				1082A7B8065FBCA1833882D5 /* App */,
+				FF533CEA055599CD04C2F2DC /* Features */,
+				143FFAE2B030713948BFBAB7 /* Resources */,
+				F08CCB65098A21A04677E8CF /* Shared */,
+			);
+			path = XTrustMacApp;
+			sourceTree = "<group>";
+		};
+		D128512FFDF2D7BF341FDC53 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				0B8203599318178CFC0FE23E /* AppCore */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+		F08CCB65098A21A04677E8CF /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				0BD655090BEE7DF2EB7611B1 /* .gitkeep */,
+				AA322B047B4588EAC739AAC5 /* AudioPlaybackController.swift */,
+				1B717838272D4016CA9091B5 /* CopyableDetailRow.swift */,
+				C87E0546F37CE687A12C03E5 /* DiagnosticsView.swift */,
+				EC877D5F1F438AFC5A5F45AC /* MicrophoneRecorder.swift */,
+				6432B9AEAE14BE6F8FDE43A8 /* WhisperTranscriber.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		FF533CEA055599CD04C2F2DC /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				43DB9155B0668067122FED0D /* .gitkeep */,
+				732B56C6EDD12B5CA3380717 /* Sessions */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8F0C40B22EC9B4BA22EBC79E /* XTrustMacApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9DFC03CCB324CFFC1AE0CD60 /* Build configuration list for PBXNativeTarget "XTrustMacApp" */;
+			buildPhases = (
+				76DB1644CCE01EC2031007A1 /* Sources */,
+				9DBF4A6915DCE9A745EC970B /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = XTrustMacApp;
+			packageProductDependencies = (
+				16559683B08FCD35730BF90D /* AppCore */,
+			);
+			productName = XTrustMacApp;
+			productReference = ED547DCBCF6CC917E2B8427E /* XTrustMacApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		709BEB530931F565B1B5CF0E /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					8F0C40B22EC9B4BA22EBC79E = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = D44286807719CEAD1987A36A /* Build configuration list for PBXProject "XTrustMacApp" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = B048EF2420E08954A1243A46;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D01A85E072519ECC0264FD4B /* XCLocalSwiftPackageReference "Packages/AppCore" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 292EF4AC68EB759D6E71D1EE /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8F0C40B22EC9B4BA22EBC79E /* XTrustMacApp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		76DB1644CCE01EC2031007A1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CF8906C4E9E105CE115CA3A5 /* AppDelegate.swift in Sources */,
+				67930E7B9AA67AC250C7ED7E /* AppDiagnostics.swift in Sources */,
+				C50C6FD5BB908566CD52FB47 /* AppRuntime.swift in Sources */,
+				3A3FF778EAB67D5BB2F2BAF9 /* AppState.swift in Sources */,
+				1FA48225782CC8ABBA9C452C /* AudioPlaybackController.swift in Sources */,
+				A3F17FB9D470216B2E545CA9 /* CopyableDetailRow.swift in Sources */,
+				91A9FABEC61732FA26E32687 /* DiagnosticsView.swift in Sources */,
+				42154AEA24A9331017A0E85E /* MicrophoneRecorder.swift in Sources */,
+				B187579E2D50942C02920D13 /* SessionDetailView.swift in Sources */,
+				79B9BA207CF3562ABB74B287 /* SessionListView.swift in Sources */,
+				EBCDFF256F40B9D72F47E2F6 /* WhisperTranscriber.swift in Sources */,
+				55F615E295737644A740FAC8 /* XTrustMacApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		017B69FAC98ADF3E4029C0F5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record meeting audio locally on this Mac.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.xtrust.mac-local-first";
+				PRODUCT_NAME = XTrustMacApp;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		47903071CED23A9E39914729 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		ACD1374122C9D9E12CD44304 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		DC63D7AD97E1376BC6401E06 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record meeting audio locally on this Mac.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.xtrust.mac-local-first";
+				PRODUCT_NAME = XTrustMacApp;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		9DFC03CCB324CFFC1AE0CD60 /* Build configuration list for PBXNativeTarget "XTrustMacApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				017B69FAC98ADF3E4029C0F5 /* Debug */,
+				DC63D7AD97E1376BC6401E06 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D44286807719CEAD1987A36A /* Build configuration list for PBXProject "XTrustMacApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				47903071CED23A9E39914729 /* Debug */,
+				ACD1374122C9D9E12CD44304 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		D01A85E072519ECC0264FD4B /* XCLocalSwiftPackageReference "Packages/AppCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/AppCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		16559683B08FCD35730BF90D /* AppCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 709BEB530931F565B1B5CF0E /* Project object */;
+}
