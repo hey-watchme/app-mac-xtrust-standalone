@@ -127,6 +127,10 @@ private final class InMemoryUtteranceStore: UtteranceStore, @unchecked Sendable 
         utterances.filter { $0.sessionID == sessionID }.sorted { $0.startedAt < $1.startedAt }
     }
 
+    func listUtterances(topicID: UUID) throws -> [Utterance] {
+        utterances.filter { $0.topicID == topicID }.sorted { $0.startedAt < $1.startedAt }
+    }
+
     func insertUtterance(_ utterance: Utterance) throws {
         utterances.append(utterance)
     }

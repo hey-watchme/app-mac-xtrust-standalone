@@ -21,6 +21,7 @@
 		C50C6FD5BB908566CD52FB47 /* AppRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE57E48760C5E12FE75244C1 /* AppRuntime.swift */; };
 		CF8906C4E9E105CE115CA3A5 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3556079B74CE405811406122 /* AppDelegate.swift */; };
 		EBCDFF256F40B9D72F47E2F6 /* WhisperTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6432B9AEAE14BE6F8FDE43A8 /* WhisperTranscriber.swift */; };
+		F1A2B3C4D5E6F7A8B9C0D1E2 /* LiteRTLMSummarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6E7F8A9B0C1D2 /* LiteRTLMSummarizer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,6 +42,7 @@
 		C87E0546F37CE687A12C03E5 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
 		CE57E48760C5E12FE75244C1 /* AppRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntime.swift; sourceTree = "<group>"; };
 		D3211A8FB80887592033D556 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
+		E1F2A3B4C5D6E7F8A9B0C1D2 /* LiteRTLMSummarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiteRTLMSummarizer.swift; sourceTree = "<group>"; };
 		EC877D5F1F438AFC5A5F45AC /* MicrophoneRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneRecorder.swift; sourceTree = "<group>"; };
 		ED547DCBCF6CC917E2B8427E /* XTrustMacApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XTrustMacApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -131,6 +133,7 @@
 				BD590FC1C81A0DA1FA3DCB16 /* AVAudioCaptureController.swift */,
 				1B717838272D4016CA9091B5 /* CopyableDetailRow.swift */,
 				C87E0546F37CE687A12C03E5 /* DiagnosticsView.swift */,
+				E1F2A3B4C5D6E7F8A9B0C1D2 /* LiteRTLMSummarizer.swift */,
 				EC877D5F1F438AFC5A5F45AC /* MicrophoneRecorder.swift */,
 				6432B9AEAE14BE6F8FDE43A8 /* WhisperTranscriber.swift */,
 			);
@@ -222,6 +225,7 @@
 				B187579E2D50942C02920D13 /* SessionDetailView.swift in Sources */,
 				79B9BA207CF3562ABB74B287 /* SessionListView.swift in Sources */,
 				EBCDFF256F40B9D72F47E2F6 /* WhisperTranscriber.swift in Sources */,
+				F1A2B3C4D5E6F7A8B9C0D1E2 /* LiteRTLMSummarizer.swift in Sources */,
 				55F615E295737644A740FAC8 /* XTrustMacApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

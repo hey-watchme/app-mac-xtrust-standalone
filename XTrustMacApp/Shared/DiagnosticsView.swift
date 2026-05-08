@@ -26,6 +26,11 @@ struct DiagnosticsView: View {
                 value: diagnostics.whisperModelPath,
                 isMonospaced: true
             )
+            CopyableDetailRow(
+                title: "Gemma 4 Model",
+                value: diagnostics.gemmaModelPath,
+                isMonospaced: true
+            )
             CopyableDetailRow(title: "Session Count", value: String(sessionCount))
 
             statusRow("Audio Directory", isReady: diagnostics.audioReady)
@@ -33,6 +38,7 @@ struct DiagnosticsView: View {
             statusRow("Summary Directory", isReady: diagnostics.summariesReady)
             statusRow("Models Directory", isReady: diagnostics.modelsReady)
             statusRow("Whisper Model Ready", isReady: diagnostics.whisperModelReady)
+            statusRow("Gemma 4 Model Ready", isReady: diagnostics.gemmaModelReady)
             statusRow("Database File", isReady: diagnostics.databaseReady)
             statusRow("Recording Active", isReady: diagnostics.recordingActive)
 

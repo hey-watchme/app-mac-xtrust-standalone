@@ -6,6 +6,7 @@ public struct Session: Identifiable, Equatable, Sendable {
         case recording
         case completed
         case failed
+        case closed
     }
 
     public enum TranscriptionStatus: String, Codable, Equatable, Sendable {
@@ -87,6 +88,24 @@ public struct Session: Identifiable, Equatable, Sendable {
             startedAt: startedAt,
             endedAt: endedAt,
             status: .completed,
+            audioFilePath: audioFilePath,
+            durationSeconds: durationSeconds,
+            transcriptText: transcriptText,
+            transcriptFilePath: transcriptFilePath,
+            transcriptionStatus: transcriptionStatus,
+            transcriptionError: transcriptionError,
+            transcriptionDurationSeconds: transcriptionDurationSeconds,
+            utteranceCount: utteranceCount,
+            topicCount: topicCount
+        )
+    }
+
+    public func closed(endedAt: Date) -> Session {
+        Session(
+            id: id,
+            startedAt: startedAt,
+            endedAt: endedAt,
+            status: .closed,
             audioFilePath: audioFilePath,
             durationSeconds: durationSeconds,
             transcriptText: transcriptText,

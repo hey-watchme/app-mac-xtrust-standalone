@@ -176,15 +176,32 @@ Implemented so far:
   utterance job attempt history
 - live UI refresh for `queued`, `running`, `completed`, and `failed`
   transcription job state
+- VAD-based continuous capture via `CaptureRuntime` / `AVAudioCaptureController`
+  (RMS threshold 0.01, 3-second silence boundary)
+- `utteranceFinalized` events persisted as `Utterance` + `RecordingArtifact` in
+  SQLite
+- `TopicAssignmentService` groups utterances into topics on a 60-second silence
+  gap rule
+- `Summarizer` port and `TopicSummaryRunner` for per-topic local LLM
+  summarization
+- `LiteRTLMSummarizer` adapter — calls `litert-lm run` as a subprocess with
+  `--backend gpu`, following the same Process + Pipe pattern as
+  `WhisperCLITranscriber`
+- `Gemma 4 E4B` running locally via LiteRT-LM (`gemma-4-E4B-it.litertlm`,
+  3.4 GB, int4-quantized); end-to-end Japanese meeting summary confirmed
+- `Session.Status.closed` + `SessionService.closeSession()`
+- per-topic `Summarize` button, summary status badge, and summary text display
+- `Close Session` button and `Copy Wrap-Up` (Markdown to clipboard)
+- Diagnostics screen shows Whisper and Gemma 4 model paths and ready status
 
 Current verification:
 
 - `swift build`
-- `swift test`
+- `swift test` — 25 tests pass
 - `xcodebuild -project XTrustMacApp.xcodeproj -scheme XTrustMacApp build`
-- manual flow: create session -> record -> play back -> transcribe -> confirm
-  `Latest Transcription Job`, `jobs/transcription/<job_id>/`, and final
-  transcript file under `transcripts/`
+- manual flow: create session → start VAD capture → speak → silence 3s →
+  utterance created → transcribe (Whisper) → summarize topic (Gemma 4 E4B) →
+  close session → copy wrap-up
 
 Open in Xcode:
 
@@ -200,46 +217,49 @@ Note:
   Development`; `Sign to Run Locally` may cause repeated permission prompts on
   this app
 
-## ASR prerequisite
+## Prerequisites
 
-The current Milestone 3 path uses the locally installed Python `whisper` CLI.
+The app does not download models at runtime. Place both model files before
+first use. Exact paths are shown in the app under `Diagnostics`.
 
-The app does not download Whisper models at runtime. This is intentional, so
-ASR does not depend on live network access or local SSL trust settings.
+### Whisper (ASR)
 
-Place the model file here before pressing `Transcribe Recording`:
+Install the `whisper` Python package and place the model file at:
 
 - `~/Library/Application Support/XTrust/com.xtrust.mac-local-first/models/whisper/small.pt`
 
-You can confirm the exact path in the app under `Diagnostics`:
+Diagnostics keys: `Whisper Model` / `Whisper Model Ready`
 
-- `Whisper Model`
-- `Whisper Model Ready`
+### Gemma 4 E4B (local LLM summarization)
 
-If the file is missing, ASR will fail with a direct local-path error instead of
-trying to download the model.
+Install `litert-lm` and download the model:
+
+```bash
+pip install litert-lm
+hf download litert-community/gemma-4-E4B-it-litert-lm gemma-4-E4B-it.litertlm \
+  --local-dir "$HOME/Library/Application Support/XTrust/com.xtrust.mac-local-first/models/gemma4/"
+```
+
+Diagnostics keys: `Gemma 4 Model` / `Gemma 4 Model Ready`
+
+If either model file is missing, the corresponding feature will fail with a
+direct local-path error instead of attempting a network download.
 
 ## Recommended next step
 
-The `TranscriptionJob` runner is now the main line.
+The vertical path through Milestone 7 is complete end-to-end.
 
-The next implementation step is to finish the UI and data-model shift toward
-utterance-owned durable state:
+The next planned improvement is to replace `LiteRTLMSummarizer` with an
+MLX-based adapter for better Apple Silicon utilization:
 
-- show transcript artifact history per transcription attempt, not only the
-  latest job
-- remove more of the remaining session-level transcription scaffolding in favor
-  of utterance-driven state
-- keep manual verification focused on restart persistence, diagnostics
-  retention, and retry history
-- after that, start the capture runtime split for microphone monitoring, VAD,
-  and automatic utterance creation
+- see `docs/mlx-migration-plan.md` for the full migration plan
+- model: `mlx-community/gemma-4-e4b-it-4bit` via `mlx_lm.generate`
+- implementation delta is minimal (subprocess executable + arguments only)
 
 Before the next coding session, use these documents as the source of truth:
 
-- `docs/product-requirements.md`
+- `docs/next-session-handoff.md`
+- `docs/mlx-migration-plan.md`
 - `docs/milestones.md`
-- `docs/design-reset.md`
 - `docs/implementation-plan.md`
 - `docs/architecture.md`
-- `docs/next-session-handoff.md`

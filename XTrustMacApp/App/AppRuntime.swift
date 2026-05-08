@@ -9,7 +9,9 @@ struct AppRuntime {
     let microphoneRecorder: MicrophoneRecorder
     let audioPlaybackController: AudioPlaybackController
     let whisperTranscriber: WhisperCLITranscriber
+    let gemmaSummarizer: LiteRTLMSummarizer
     let transcriptionJobRunner: TranscriptionJobRunner
+    let topicSummaryRunner: TopicSummaryRunner
     let captureRuntime: CaptureRuntime
     let initialSessions: [Session]
     let diagnostics: AppDiagnostics
@@ -21,9 +23,14 @@ struct AppRuntime {
         let paths = WorkspacePaths(root: root)
         let bootstrap = BootstrapWorkspace(fileManager: LocalFileManager())
         _ = try bootstrap.run(paths: paths)
+        let modelsRoot = paths.models.path(percentEncoded: false)
         let whisperTranscriber = WhisperCLITranscriber(
-            configuration: .developmentDefault(modelsRootDirectory: paths.models.path(percentEncoded: false))
+            configuration: .developmentDefault(modelsRootDirectory: modelsRoot)
         )
+        let gemmaConfiguration = LiteRTLMSummarizerConfiguration.developmentDefault(
+            modelsRootDirectory: modelsRoot
+        )
+        let gemmaSummarizer = LiteRTLMSummarizer(configuration: gemmaConfiguration)
         let sessionStore = SQLiteSessionStore(databaseURL: paths.database)
         let sessionService = SessionService(
             sessionStore: sessionStore,
@@ -39,6 +46,12 @@ struct AppRuntime {
         let topicAssignmentService = TopicAssignmentService(
             topicStore: sessionStore,
             utteranceStore: sessionStore
+        )
+        let topicSummaryRunner = TopicSummaryRunner(
+            topicStore: sessionStore,
+            utteranceStore: sessionStore,
+            transcriptArtifactStore: sessionStore,
+            summarizer: gemmaSummarizer
         )
         let captureRuntime = CaptureRuntime(
             captureController: AVAudioCaptureController(),
@@ -58,13 +71,16 @@ struct AppRuntime {
             microphoneRecorder: microphoneRecorder,
             audioPlaybackController: audioPlaybackController,
             whisperTranscriber: whisperTranscriber,
+            gemmaSummarizer: gemmaSummarizer,
             transcriptionJobRunner: transcriptionJobRunner,
+            topicSummaryRunner: topicSummaryRunner,
             captureRuntime: captureRuntime,
             initialSessions: sessions,
             diagnostics: AppDiagnostics(
                 paths: paths,
                 recordingActive: microphoneRecorder.isRecording,
-                whisperConfiguration: whisperTranscriber.configuration
+                whisperConfiguration: whisperTranscriber.configuration,
+                gemmaConfiguration: gemmaConfiguration
             )
         )
     }

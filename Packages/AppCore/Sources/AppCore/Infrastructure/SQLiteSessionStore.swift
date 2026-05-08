@@ -384,6 +384,37 @@ public final class SQLiteSessionStore: SessionStore, TopicStore, UtteranceStore,
         return utterances
     }
 
+    public func listUtterances(topicID: UUID) throws -> [Utterance] {
+        let db = try openDatabase()
+        defer { sqlite3_close(db) }
+
+        let sql = """
+        SELECT
+            id, session_id, topic_id, started_at, ended_at, duration_seconds,
+            audio_path, transcript_text, transcript_file_path, transcription_status,
+            transcription_error, transcription_duration_seconds
+        FROM utterances
+        WHERE topic_id = ?
+        ORDER BY started_at ASC;
+        """
+
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw SQLiteSessionStoreError.prepare(message: errorMessage(from: db))
+        }
+        defer { sqlite3_finalize(statement) }
+
+        sqlite3_bind_text(statement, 1, topicID.uuidString, -1, transientDestructor)
+
+        var utterances: [Utterance] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            guard let utterance = decodeUtterance(from: statement) else { continue }
+            utterances.append(utterance)
+        }
+
+        return utterances
+    }
+
     public func insertUtterance(_ utterance: Utterance) throws {
         let db = try openDatabase()
         defer { sqlite3_close(db) }

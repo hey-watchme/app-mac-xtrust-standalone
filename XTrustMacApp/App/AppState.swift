@@ -17,9 +17,12 @@ final class AppState: ObservableObject {
     let microphoneRecorder: MicrophoneRecorder
     let audioPlaybackController: AudioPlaybackController
     let whisperTranscriber: WhisperCLITranscriber
+    let gemmaSummarizer: LiteRTLMSummarizer
     let transcriptionJobRunner: TranscriptionJobRunner
+    let topicSummaryRunner: TopicSummaryRunner
     let captureRuntime: CaptureRuntime
     private var transcriptionRefreshTask: Task<Void, Never>?
+    private var summaryRefreshTask: Task<Void, Never>?
     @Published var selectedSessionID: Session.ID?
     @Published var activeRecordingSessionID: Session.ID?
     @Published var activePlaybackFilePath: String?
@@ -39,7 +42,9 @@ final class AppState: ObservableObject {
             microphoneRecorder: runtime.microphoneRecorder,
             audioPlaybackController: runtime.audioPlaybackController,
             whisperTranscriber: runtime.whisperTranscriber,
+            gemmaSummarizer: runtime.gemmaSummarizer,
             transcriptionJobRunner: runtime.transcriptionJobRunner,
+            topicSummaryRunner: runtime.topicSummaryRunner,
             captureRuntime: runtime.captureRuntime,
             selectedSessionID: runtime.initialSessions.first?.id,
             activeRecordingSessionID: nil,
@@ -58,7 +63,9 @@ final class AppState: ObservableObject {
         microphoneRecorder: MicrophoneRecorder,
         audioPlaybackController: AudioPlaybackController,
         whisperTranscriber: WhisperCLITranscriber,
+        gemmaSummarizer: LiteRTLMSummarizer,
         transcriptionJobRunner: TranscriptionJobRunner,
+        topicSummaryRunner: TopicSummaryRunner,
         captureRuntime: CaptureRuntime,
         selectedSessionID: Session.ID?,
         activeRecordingSessionID: Session.ID?,
@@ -74,7 +81,9 @@ final class AppState: ObservableObject {
         self.microphoneRecorder = microphoneRecorder
         self.audioPlaybackController = audioPlaybackController
         self.whisperTranscriber = whisperTranscriber
+        self.gemmaSummarizer = gemmaSummarizer
         self.transcriptionJobRunner = transcriptionJobRunner
+        self.topicSummaryRunner = topicSummaryRunner
         self.captureRuntime = captureRuntime
         self.selectedSessionID = selectedSessionID
         self.activeRecordingSessionID = activeRecordingSessionID
@@ -283,7 +292,8 @@ final class AppState: ObservableObject {
         diagnostics = AppDiagnostics(
             paths: paths,
             recordingActive: microphoneRecorder.isRecording,
-            whisperConfiguration: whisperTranscriber.configuration
+            whisperConfiguration: whisperTranscriber.configuration,
+            gemmaConfiguration: gemmaSummarizer.configuration
         )
     }
 
@@ -390,6 +400,84 @@ final class AppState: ObservableObject {
     private func stopTranscriptionRefreshLoop() {
         transcriptionRefreshTask?.cancel()
         transcriptionRefreshTask = nil
+    }
+
+    func summarizeTopic(topicID: UUID) async {
+        guard let sessionID = selectedSessionID,
+              let topic = selectedSessionDetail?.topics.first(where: { $0.id == topicID }) else {
+            errorMessage = "Topic not found."
+            return
+        }
+        do {
+            errorMessage = nil
+            startSummaryRefreshLoop(selecting: sessionID)
+            defer { stopSummaryRefreshLoop() }
+            try await topicSummaryRunner.run(topic: topic)
+            try reloadSessions(selecting: sessionID)
+        } catch {
+            try? reloadSessions(selecting: sessionID)
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func closeSession() {
+        guard let session = selectedSession, session.status != .closed else { return }
+        if isListening { stopListening() }
+        do {
+            let closedSession = try sessionService.closeSession(session)
+            if let index = sessions.firstIndex(where: { $0.id == closedSession.id }) {
+                sessions[index] = closedSession
+            }
+            refreshSelectedSessionDetail()
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func wrapUpText(for detail: SessionDetailSnapshot) -> String {
+        var lines: [String] = []
+        let startStr = detail.session.startedAt.formatted(.dateTime.year().month().day().hour().minute())
+        lines.append("# Session — \(startStr)")
+        lines.append("")
+
+        for (index, topic) in detail.topics.enumerated() {
+            let topicTime = topic.startedAt.formatted(.dateTime.hour().minute().second())
+            lines.append("## Topic \(index + 1) — \(topicTime)")
+            lines.append("")
+            if let summaryText = topic.summaryText {
+                lines.append("### Summary")
+                lines.append(summaryText)
+                lines.append("")
+            }
+            let topicUtterances = detail.utterances.filter { $0.utterance.topicID == topic.id }
+            if !topicUtterances.isEmpty {
+                lines.append("### Utterances")
+                for ud in topicUtterances {
+                    let t = ud.utterance.startedAt.formatted(.dateTime.hour().minute().second())
+                    let text = ud.latestTranscriptArtifact?.text ?? "(not transcribed)"
+                    lines.append("- [\(t)] \(text)")
+                }
+                lines.append("")
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private func startSummaryRefreshLoop(selecting sessionID: Session.ID) {
+        stopSummaryRefreshLoop()
+        summaryRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .milliseconds(500)) } catch { break }
+                guard let self else { return }
+                try? self.reloadSessions(selecting: sessionID)
+            }
+        }
+    }
+
+    private func stopSummaryRefreshLoop() {
+        summaryRefreshTask?.cancel()
+        summaryRefreshTask = nil
     }
 
     private func refreshTranscriptionState(selecting sessionID: Session.ID) async {

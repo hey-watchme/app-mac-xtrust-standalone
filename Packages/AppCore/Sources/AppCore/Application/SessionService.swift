@@ -53,4 +53,10 @@ public struct SessionService: Sendable {
         return updatedSession
     }
 
+    public func closeSession(_ session: Session) throws -> Session {
+        let updatedSession = session.closed(endedAt: clock.now())
+        try sessionStore.updateSession(updatedSession)
+        return updatedSession
+    }
+
 }

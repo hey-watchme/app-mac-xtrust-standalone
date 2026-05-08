@@ -9,6 +9,9 @@ struct SessionDetailView: View {
     let onStartListening: () -> Void
     let onStopListening: () -> Void
     let onTranscribeUtterance: (UUID) -> Void
+    let onSummarizeTopic: (UUID) -> Void
+    let onCloseSession: () -> Void
+    let onCopyWrapUp: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -52,6 +55,14 @@ struct SessionDetailView: View {
                     } else {
                         Button("Start") { onStartListening() }
                             .buttonStyle(.borderedProminent)
+                            .disabled(session.status == .closed)
+                        if session.status != .closed {
+                            Button("Close Session") { onCloseSession() }
+                                .buttonStyle(.bordered)
+                                .foregroundStyle(.orange)
+                        }
+                        Button("Copy Wrap-Up") { onCopyWrapUp() }
+                            .buttonStyle(.bordered)
                     }
                 }
 
@@ -149,24 +160,76 @@ struct SessionDetailView: View {
 
     @ViewBuilder
     private func topicHeaderView(topic: Topic, index: Int) -> some View {
-        HStack(spacing: 8) {
-            Text("Topic \(index)")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-            Text("— \(format(date: topic.startedAt))")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            if topic.status == .active {
-                Text("active")
-                    .font(.caption2)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.green.opacity(0.15))
-                    .foregroundStyle(.green)
-                    .clipShape(Capsule())
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text("Topic \(index)")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                Text("— \(format(date: topic.startedAt))")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if topic.status == .active {
+                    Text("active")
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.green.opacity(0.15))
+                        .foregroundStyle(.green)
+                        .clipShape(Capsule())
+                }
+                Spacer()
+                summaryBadge(for: topic)
+                Button("Summarize") { onSummarizeTopic(topic.id) }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(topic.summaryStatus == .running)
+            }
+            if let summaryText = topic.summaryText {
+                Text(summaryText)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .padding(.horizontal, 4)
+            }
+            if let summaryError = topic.summaryError, topic.summaryStatus == .failed {
+                Text("Summary failed: \(summaryError)")
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
         }
         .padding(.top, 4)
+    }
+
+    @ViewBuilder
+    private func summaryBadge(for topic: Topic) -> some View {
+        switch topic.summaryStatus {
+        case .idle:
+            EmptyView()
+        case .running:
+            Text("要約中…")
+                .font(.caption2)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.blue.opacity(0.15))
+                .foregroundStyle(.blue)
+                .clipShape(Capsule())
+        case .completed:
+            Text("要約完了")
+                .font(.caption2)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.green.opacity(0.15))
+                .foregroundStyle(.green)
+                .clipShape(Capsule())
+        case .failed:
+            Text("要約失敗")
+                .font(.caption2)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.red.opacity(0.15))
+                .foregroundStyle(.red)
+                .clipShape(Capsule())
+        }
     }
 
     @ViewBuilder

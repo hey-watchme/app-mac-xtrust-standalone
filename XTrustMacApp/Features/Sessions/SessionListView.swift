@@ -52,6 +52,17 @@ struct SessionListView: View {
                         onStopListening: { appState.stopListening() },
                         onTranscribeUtterance: { utteranceID in
                             Task { await appState.transcribeUtterance(utteranceID: utteranceID) }
+                        },
+                        onSummarizeTopic: { topicID in
+                            Task { await appState.summarizeTopic(topicID: topicID) }
+                        },
+                        onCloseSession: { appState.closeSession() },
+                        onCopyWrapUp: {
+                            if let detail = appState.selectedSessionDetail {
+                                let text = appState.wrapUpText(for: detail)
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(text, forType: .string)
+                            }
                         }
                     )
 

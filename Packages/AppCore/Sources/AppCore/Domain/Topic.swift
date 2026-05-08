@@ -41,4 +41,25 @@ public struct Topic: Identifiable, Equatable, Sendable {
         self.summaryStatus = summaryStatus
         self.summaryError = summaryError
     }
+
+    public func withSummaryRunning() -> Topic {
+        Topic(
+            id: id, sessionID: sessionID, startedAt: startedAt, endedAt: endedAt,
+            status: status, summaryText: nil, summaryStatus: .running, summaryError: nil
+        )
+    }
+
+    public func withSummaryCompleted(text: String) -> Topic {
+        Topic(
+            id: id, sessionID: sessionID, startedAt: startedAt, endedAt: endedAt,
+            status: status, summaryText: text, summaryStatus: .completed, summaryError: nil
+        )
+    }
+
+    public func withSummaryFailed(error: String) -> Topic {
+        Topic(
+            id: id, sessionID: sessionID, startedAt: startedAt, endedAt: endedAt,
+            status: status, summaryText: nil, summaryStatus: .failed, summaryError: error
+        )
+    }
 }
