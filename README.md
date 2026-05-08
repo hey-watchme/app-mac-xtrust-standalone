@@ -1,6 +1,6 @@
 # Mac Local-First Meeting Notes PoC
 
-Date: 2026-05-07 JST
+Date: 2026-05-08 JST
 
 This directory is reserved for a new standalone macOS PoC that runs on a
 MacBook M1 Pro class machine and is independent from WatchMe / ZeroTouch cloud
@@ -161,11 +161,21 @@ Implemented so far:
 - `New Session` creation and relaunch persistence
 - microphone recording to local `wav`
 - local playback of recorded audio
-- manual file-based ASR trigger through the Python `whisper` CLI
 - first successful local transcription confirmed end-to-end from the app UI
 - explicit startup and runtime error surfacing without fallback workspace
 - initial `recording artifact`, `transcription job`, and `transcript artifact`
   domain contracts in `AppCore`
+- persisted `TranscriptionJob` runner backed by isolated
+  `jobs/transcription/<job_id>/` workspaces
+- Whisper execution moved behind `AppCore` ports instead of the direct UI path
+- durable capture of stdout, stderr, exit code, output files, and validation
+  before transcript promotion into final `transcripts/`
+- retryable transcription attempts that create new jobs instead of overwriting
+  prior evidence
+- `Session Detail` UI that shows latest job state, diagnostics paths, and per-
+  utterance job attempt history
+- live UI refresh for `queued`, `running`, `completed`, and `failed`
+  transcription job state
 
 Current verification:
 
@@ -173,6 +183,7 @@ Current verification:
 - `swift test`
 - `xcodebuild -project XTrustMacApp.xcodeproj -scheme XTrustMacApp build`
 - manual flow: create session -> record -> play back -> transcribe -> confirm
+  `Latest Transcription Job`, `jobs/transcription/<job_id>/`, and final
   transcript file under `transcripts/`
 
 Open in Xcode:
@@ -185,6 +196,9 @@ Note:
 
 - use `XTrustMacApp.xcodeproj` for running the app
 - keep `Package.swift` for command-line build and test workflows only
+- for stable microphone permission retention, prefer `Signing Certificate:
+  Development`; `Sign to Run Locally` may cause repeated permission prompts on
+  this app
 
 ## ASR prerequisite
 
@@ -207,16 +221,19 @@ trying to download the model.
 
 ## Recommended next step
 
-The next implementation step is no longer another direct patch on
-`Transcribe Recording`.
+The `TranscriptionJob` runner is now the main line.
 
-Build the first real transcription job runner:
+The next implementation step is to finish the UI and data-model shift toward
+utterance-owned durable state:
 
-- create one persisted `TranscriptionJob` per utterance transcription attempt
-- use `jobs/transcription/<job_id>/` as the isolated sidecar working directory
-- capture stdout, stderr, exit code, and generated files per job
-- validate the transcript artifact before promoting it into final `transcripts/`
-- have the UI read job state instead of directly owning the Whisper process
+- show transcript artifact history per transcription attempt, not only the
+  latest job
+- remove more of the remaining session-level transcription scaffolding in favor
+  of utterance-driven state
+- keep manual verification focused on restart persistence, diagnostics
+  retention, and retry history
+- after that, start the capture runtime split for microphone monitoring, VAD,
+  and automatic utterance creation
 
 Before the next coding session, use these documents as the source of truth:
 

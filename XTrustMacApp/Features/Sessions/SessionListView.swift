@@ -10,7 +10,7 @@ struct SessionListView: View {
                 appState.sessions,
                 selection: Binding(
                     get: { appState.selectedSessionID },
-                    set: { appState.selectedSessionID = $0 }
+                    set: { appState.selectSession($0) }
                 )
             ) { session in
                 VStack(alignment: .leading, spacing: 6) {
@@ -62,7 +62,7 @@ struct SessionListView: View {
                     }
 
                 SessionDetailView(
-                    session: appState.selectedSession,
+                    detail: appState.selectedSessionDetail,
                     isPlaying: appState.isPlayingSelectedSession,
                     onTogglePlayback: { appState.togglePlaybackForSelectedSession() },
                     onStopPlayback: { appState.stopPlayback() },

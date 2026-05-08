@@ -17,7 +17,7 @@ struct AppDiagnostics {
         paths: WorkspacePaths,
         fileManager: FileManager = .default,
         recordingActive: Bool = false,
-        whisperConfiguration: WhisperTranscriberConfiguration
+        whisperConfiguration: WhisperCLITranscriberConfiguration
     ) {
         self.workspaceRoot = paths.root
         self.databaseURL = paths.database

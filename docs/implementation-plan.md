@@ -217,13 +217,17 @@ Exit criteria:
 
 ## Immediate next code task
 
-Do not continue patching the current direct `Transcribe Recording` path as the
-main line.
+The main line is now the persisted `TranscriptionJob` runner and the first
+operator-visible job UI.
 
-Implement Phase 1 and Phase 2 contracts first:
+Complete the remaining Phase 4 work before starting capture runtime split:
 
-1. introduce transcription job and artifact metadata models
-2. add stores for transcription jobs and artifacts
-3. define job workspace paths under `jobs/transcription/<job_id>/`
-4. write fixture-based tests for job directory creation and output validation
-5. only then wire Whisper through the new job runner
+1. show transcript artifact history per transcription attempt, not only the
+   latest artifact
+2. reduce remaining session-level transcription fields so the UI depends more
+   directly on utterance-owned durable state
+3. harden the manual verification checklist for restart persistence, retry
+   history, and diagnostics retention
+4. once those are stable, start Phase 5 by splitting microphone monitoring,
+   VAD boundary detection, and utterance recording into separate runtime
+   responsibilities
