@@ -53,7 +53,9 @@ struct SessionListView: View {
                         .disabled(appState.isRecording)
 
                         Button("Stop Recording") {
-                            appState.stopRecording()
+                            Task {
+                                await appState.stopRecording()
+                            }
                         }
                         .buttonStyle(.bordered)
                         .disabled(!appState.isRecording)

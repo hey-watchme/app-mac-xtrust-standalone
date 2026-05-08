@@ -22,7 +22,7 @@ Goal:
 Scope:
 
 - confirm the standalone product purpose
-- confirm `utterance -> topic -> memo` hierarchy
+- confirm `session -> topic -> utterance` hierarchy
 - define silence thresholds
 - define local-only requirement
 - define first non-goals
@@ -31,6 +31,7 @@ Exit criteria:
 
 - one written requirements document exists
 - one written milestone sequence exists
+- one written implementation plan exists
 - one written decision list exists for unresolved product choices
 
 Deferred:
@@ -61,19 +62,20 @@ Exit criteria:
 
 Deferred:
 
-- always-on capture
+- session-controlled listening
 - real VAD
 - real topic formation
 
-## Milestone 2: Continuous microphone monitoring
+## Milestone 2: Session-controlled microphone monitoring
 
 Goal:
 
-- prove that the app can remain active and monitor microphone input without
-  manual start/stop recording
+- prove that one operator-opened session can remain active and monitor
+  microphone input without manual start/stop recording per utterance
 
 Scope:
 
+- active session lifecycle
 - microphone permission flow
 - input pipeline setup
 - audio level monitoring
@@ -82,6 +84,7 @@ Scope:
 
 Exit criteria:
 
+- operator can open one session and start listening
 - app can remain active and monitor input for an extended period
 - operator can see whether listening is active
 - no continuous raw recording file is required yet
@@ -96,20 +99,22 @@ Deferred:
 
 Goal:
 
-- convert continuous monitoring into utterance artifacts
+- convert continuous monitoring into utterance artifacts inside one session
 
 Scope:
 
 - VAD integration
 - 3-second silence rule for utterance boundaries
+- attach utterances to the currently open session
 - one audio artifact per utterance
 - utterance persistence
-- utterance list / inspection UI
+- utterance card list / inspection UI
 
 Exit criteria:
 
 - normal speech creates utterance records automatically
 - silence >= 3 seconds creates a new utterance boundary
+- utterances appear under the active session in time order
 - saved utterances are visible after restart
 
 Deferred:
@@ -165,7 +170,7 @@ Exit criteria:
 
 Deferred:
 
-- memo-level summaries
+- session-level wrap-up
 - knowledge projections
 
 ## Milestone 6: Local topic summarization
@@ -188,26 +193,26 @@ Exit criteria:
 
 Deferred:
 
-- memo-level synthesis
+- session-level synthesis
 - knowledge indexing
 
-## Milestone 7: Memo aggregation
+## Milestone 7: Session wrap-up
 
 Goal:
 
-- define and implement the first operator-facing memo unit
+- define and implement the first operator-facing session close and wrap-up flow
 
 Scope:
 
-- choose initial memo boundary strategy
-- aggregate topics into one memo
-- memo summary or wrap-up generation
-- exportable memo representation
+- explicit session close behavior
+- aggregate topics into one session-level wrap-up
+- session summary or wrap-up generation
+- exportable session representation
 
 Exit criteria:
 
-- operator can inspect one memo composed of topics
-- memo can be exported or copied in a stable format
+- operator can inspect one closed session composed of topics
+- session wrap-up can be exported or copied in a stable format
 
 Deferred:
 
@@ -228,7 +233,7 @@ Scope:
 
 Exit criteria:
 
-- utterances, topics, and memos can be traversed and queried locally
+- sessions, utterances, and topics can be traversed and queried locally
 - schema is stable enough for future knowledge features
 
 Deferred:
@@ -265,7 +270,7 @@ Deferred:
 
 These should be answered before Milestone 7:
 
-- what is the first memo boundary: day, manual session, or another rule
+- whether one operator-opened session is always the boundary for one wrap-up
 - whether topic summaries are generated eagerly or on idle time
 - whether failed utterance ASR blocks topic summarization or not
 - how much raw audio should be retained after transcription

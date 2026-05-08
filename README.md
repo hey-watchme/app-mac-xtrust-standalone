@@ -25,17 +25,8 @@ Technical stack and implementation planning are tracked in:
 
 ## Why this project exists
 
-The Android standalone local-LLM PoC was useful as an edge-device validation,
-but it hit practical limits on a 4 GB RAM class tablet:
-
-- local LLM runtime capacity was not sufficient for stable day-to-day use
-- swap pressure and system slowdown were too severe
-- the device was good enough for API-connected workflows, but not for the
-  local-only meeting-notes target
-
-The local-first product line now shifts to a laptop-first target, starting with
-this MacBook M1 Pro. The tablet line continues separately as an API-connected
-product.
+This project establishes a laptop-first local-first product line, starting with
+this MacBook M1 Pro.
 
 ## Goal
 
@@ -79,16 +70,12 @@ Create a separate sibling project here:
 /Users/kaya.matsumoto/projects/xtrust/app/mac-local-first/
 ```
 
-Do not extend `app/android-standalone/` for this line.
-
 Reason:
 
 - the target OS, runtime, permissions, packaging, and UI conventions are
   different
 - mixing Android and macOS assumptions in one app tree would make planning and
   maintenance harder
-- the Android local-only findings should remain preserved as a closed
-  validation branch
 
 ## Recommended app shape
 
@@ -142,8 +129,6 @@ Do not start with:
 ## Relationship to other tracks
 
 - this project is the Mac local-first / zero-trust-oriented line
-- the tablet line continues separately as the API-connected product path
-- Android local-only findings remain preserved in `app/android-standalone/`
 
 ## Suggested structure
 
@@ -177,12 +162,18 @@ Implemented so far:
 - microphone recording to local `wav`
 - local playback of recorded audio
 - manual file-based ASR trigger through the Python `whisper` CLI
+- first successful local transcription confirmed end-to-end from the app UI
+- explicit startup and runtime error surfacing without fallback workspace
+- initial `recording artifact`, `transcription job`, and `transcript artifact`
+  domain contracts in `AppCore`
 
 Current verification:
 
 - `swift build`
 - `swift test`
 - `xcodebuild -project XTrustMacApp.xcodeproj -scheme XTrustMacApp build`
+- manual flow: create session -> record -> play back -> transcribe -> confirm
+  transcript file under `transcripts/`
 
 Open in Xcode:
 
@@ -216,11 +207,22 @@ trying to download the model.
 
 ## Recommended next step
 
-Implementation is currently paused pending a product reset.
+The next implementation step is no longer another direct patch on
+`Transcribe Recording`.
+
+Build the first real transcription job runner:
+
+- create one persisted `TranscriptionJob` per utterance transcription attempt
+- use `jobs/transcription/<job_id>/` as the isolated sidecar working directory
+- capture stdout, stderr, exit code, and generated files per job
+- validate the transcript artifact before promoting it into final `transcripts/`
+- have the UI read job state instead of directly owning the Whisper process
 
 Before the next coding session, use these documents as the source of truth:
 
 - `docs/product-requirements.md`
 - `docs/milestones.md`
+- `docs/design-reset.md`
+- `docs/implementation-plan.md`
 - `docs/architecture.md`
 - `docs/next-session-handoff.md`

@@ -1,180 +1,173 @@
 # Mac Local-First Testing Strategy
 
-Date: 2026-05-07 JST
+Date: 2026-05-08 JST
 
 ## Objective
 
-Keep implementation incremental and testable from the first milestone.
+Test contracts before testing UI flows.
 
-## Principles
+The product depends on local files, sidecar processes, and long-running jobs.
+Those are predictable only if the pipeline is tested in layers with fixture
+inputs and inspectable outputs.
 
-- test the smallest useful slice first
-- prefer deterministic file-based checks over complex live automation early on
-- isolate pure logic so it can be unit-tested without audio devices or models
-- add fixture-driven integration tests before broad end-to-end coverage
+## Testing principles
 
-## Test layers
+- unit-test state transitions without audio devices or model binaries
+- integration-test filesystem and SQLite contracts with temporary directories
+- run sidecar tests through dedicated job directories
+- treat process exit code and output validation as separate checks
+- keep UI smoke checks last
 
-### Layer 1: manual smoke checks
+## Contract layers
 
-Use for:
-
-- window launch
-- permission prompts
-- microphone capture
-- local file creation
-- visible job status transitions
-
-Rule:
-
-- every milestone must end with one short smoke checklist that can be rerun in
-  a few minutes
-
-### Layer 2: unit tests
+### Layer 1: Domain state tests
 
 Use for:
 
-- prompt builders
-- file-path resolution
-- session state reducers
-- export formatting
-- database mapping helpers
+- session lifecycle
+- utterance lifecycle
+- transcription job lifecycle
+- retry behavior
+- failure isolation
 
-Rule:
+Required examples:
 
-- pure logic should not depend on audio devices, model binaries, or UI state
+- utterance cannot enter `transcribing` without a finalized audio artifact
+- failed transcription does not change session status
+- retry creates a new job attempt
 
-### Layer 3: integration tests
-
-Use for:
-
-- SQLite schema and CRUD flows
-- sidecar process wrappers
-- transcript import / parse flows
-- summary result parsing
-
-Rule:
-
-- integration tests should use canned fixtures and fake sidecar outputs where
-  possible
-
-### Layer 4: fixture-based end-to-end checks
+### Layer 2: Filesystem artifact tests
 
 Use for:
 
-- `wav -> ASR -> transcript save`
-- `transcript -> LLM -> summary save`
+- workspace directory layout
+- job directory creation
+- atomic promotion from job output to final artifact storage
+- stale-file isolation
+
+Required examples:
+
+- stale files in `transcripts/` do not affect a new transcription job
+- each job writes under `jobs/transcription/<job_id>/`
+- final transcript is promoted only after validation
+
+### Layer 3: SQLite integration tests
+
+Use for:
+
+- sessions, topics, utterances
+- recording artifacts
+- transcription jobs
+- transcript artifacts
+- restart recovery
+
+Required examples:
+
+- one session owns many utterances
+- one utterance can have multiple transcription attempts
+- failed job evidence survives store reload
+
+### Layer 4: Fake sidecar tests
+
+Use for:
+
+- process runner behavior
+- stdout/stderr capture
+- generated file inspection
+- success and failure mapping
+
+Required examples:
+
+- fake transcriber produces exactly one txt file and succeeds
+- fake transcriber exits 0 but produces no txt file and fails validation
+- fake transcriber exits nonzero and preserves stderr
+
+### Layer 5: Real fixture sidecar tests
+
+Use for:
+
+- one short fixture wav
+- one expected text artifact shape
+- local Whisper runtime validation
+
+Rules:
+
+- mark these tests as explicit or developer-run if they require local model
+  files
+- keep them out of the fast unit-test loop unless the model is guaranteed
+  present
+
+### Layer 6: UI smoke checks
+
+Use for:
+
+- app launch
+- operator-visible state
+- manual microphone permission flow
+- final end-to-end sanity checks
 
 Rule:
 
-- keep the fixture set small and stable
-- run these checks only after unit and integration layers are green
+- UI smoke checks should confirm an already-tested contract, not discover the
+  contract for the first time.
 
-## Early fixture plan
+## Fixture plan
 
 Keep a minimal fixture set in `Fixtures/`:
 
-- one short clean Japanese sample
-- one longer meeting-like Japanese sample
-- one expected transcript sample
-- one expected summary-format sample
+- one short clean Japanese wav
+- one expected transcript text file
+- one fake sidecar script that writes a txt file
+- one fake sidecar script that exits 0 without writing output
+- one fake sidecar script that exits nonzero with stderr
 
 Do not start with a large corpus.
 
-## Repository skeleton
-
-Recommended initial directories:
-
-```text
-XTrustMacApp/
-  App/
-  Features/
-  Shared/
-  Resources/
-Packages/
-  AppCore/
-    Sources/
-    Tests/
-Tests/
-  AppCoreIntegrationTests/
-  XTrustMacUITests/
-Fixtures/
-  audio/
-  transcripts/
-  summaries/
-ThirdParty/
-scripts/
-```
-
-Purpose:
-
-- `XTrustMacApp/App/`: app entry, window, and dependency wiring
-- `XTrustMacApp/Features/`: recording, transcript, summary, and settings flows
-- `XTrustMacApp/Shared/`: reusable UI and small presentation helpers
-- `Packages/AppCore/`: pure logic, use cases, ports, and core tests
-- `Tests/AppCoreIntegrationTests/`: DB and process-wrapper tests
-- `Tests/XTrustMacUITests/`: a very small UI smoke suite
-- `Fixtures/`: stable sample data for repeatable checks
-- `ThirdParty/`: sidecar placement policy and version notes
-- `scripts/`: benchmark and local developer helper scripts
-
 ## Verification by milestone
 
-### Milestone 0
+### Design reset
 
 - docs review
-- folder sanity check
+- architecture contract review
+- implementation sequence review
 
-### Milestone 1
+### Domain and persistence
 
-- app launch smoke check
-- directory bootstrap test
-- `AppCore` package unit-test smoke
+- `Session`, `Topic`, `Utterance` unit tests
+- transcription job lifecycle unit tests
+- SQLite CRUD tests for all domain and job tables
 
-Recommended manual checklist:
+### Artifact filesystem
 
-- launch `XTrustMacApp` from Xcode and confirm one window appears
-- confirm the diagnostics panel shows paths for workspace and database
-- confirm `audio`, `transcripts`, `summaries`, and `models` are marked ready
-- press `New Session` and confirm one draft session appears in the list
-- quit and relaunch the app and confirm the draft session is still listed
+- temporary workspace tests
+- job workspace tests
+- stale final directory tests
+- atomic promotion tests
 
-### Milestone 2
+### Transcription job runner
 
-- manual mic recording check
-- file existence assertion
+- fake sidecar success test
+- fake sidecar no-output test
+- fake sidecar nonzero-exit test
+- optional real Whisper fixture test
 
-Recommended manual checklist:
+### UI wiring
 
-- start from a clean launch and create or select a draft session
-- press `Start Recording` and allow microphone access when prompted
-- speak for 5-10 seconds and press `Stop Recording`
-- confirm the selected session becomes `completed`
-- confirm `Audio File` and `Duration` appear in the session detail
-- relaunch the app and confirm the completed session and recorded file path persist
+- launch app
+- create/select session
+- show utterance list
+- show transcription job state
+- retry failed job from persisted state
 
-### Milestone 3
+## Manual checks
 
-- fake process-runner ASR wrapper test
-- one real fixture-based ASR wrapper test
-- one real manual transcription run
+Manual checks should be short and confirm a known contract.
 
-Recommended manual checklist:
+For ASR:
 
-- select a session that has a saved `wav`
-- press `Transcribe Recording`
-- wait for the `Transcription` status to move from `running` to `completed`
-- confirm transcript text appears in the detail view
-- confirm `Transcript File` is created under `transcripts/`
-
-### Milestone 4
-
-- prompt contract unit test
-- fixture-based summary parsing test
-- fake summarizer integration test
-- one real manual summary run
-
-### Milestone 5
-
-- failure recovery regression checklist
-- long-session manual smoke run
+1. select or create one utterance with a finalized wav
+2. start transcription
+3. confirm a job row appears as `running`
+4. confirm the job directory contains stdout/stderr and sidecar outputs
+5. confirm the final transcript appears only after validation
+6. relaunch and confirm the same state is visible

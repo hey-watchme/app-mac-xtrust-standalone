@@ -16,8 +16,8 @@ final class AppState: ObservableObject {
     @Published var diagnostics: AppDiagnostics
     @Published var errorMessage: String?
 
-    static func bootstrap() -> AppState {
-        let runtime = AppRuntime.bootstrap()
+    static func bootstrap() throws -> AppState {
+        let runtime = try AppRuntime.bootstrap()
         return AppState(
             paths: runtime.paths,
             sessionService: runtime.sessionService,
@@ -29,7 +29,7 @@ final class AppState: ObservableObject {
             activePlaybackFilePath: nil,
             sessions: runtime.initialSessions,
             diagnostics: runtime.diagnostics,
-            errorMessage: runtime.initialErrorMessage
+            errorMessage: nil
         )
     }
 
@@ -102,14 +102,14 @@ final class AppState: ObservableObject {
         }
     }
 
-    func stopRecording() {
+    func stopRecording() async {
         do {
             guard let activeRecordingSessionID,
                   let session = sessions.first(where: { $0.id == activeRecordingSessionID }) else {
                 throw MicrophoneRecorderError.notRecording
             }
 
-            let artifact = try microphoneRecorder.stopRecording()
+            let artifact = try await microphoneRecorder.stopRecording()
             let completedSession = try sessionService.markRecordingCompleted(
                 session: session,
                 audioFilePath: artifact.fileURL.path(percentEncoded: false),
@@ -205,8 +205,6 @@ final class AppState: ObservableObject {
     private func refreshDiagnostics() {
         diagnostics = AppDiagnostics(
             paths: paths,
-            usingFallbackWorkspace: diagnostics.usingFallbackWorkspace,
-            usingUnavailableServices: diagnostics.usingUnavailableServices,
             recordingActive: microphoneRecorder.isRecording,
             whisperConfiguration: whisperTranscriber.configuration
         )

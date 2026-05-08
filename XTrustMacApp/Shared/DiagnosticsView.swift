@@ -34,8 +34,6 @@ struct DiagnosticsView: View {
             statusRow("Models Directory", isReady: diagnostics.modelsReady)
             statusRow("Whisper Model Ready", isReady: diagnostics.whisperModelReady)
             statusRow("Database File", isReady: diagnostics.databaseReady)
-            statusRow("Fallback Workspace", isReady: diagnostics.usingFallbackWorkspace)
-            statusRow("Unavailable Services", isReady: diagnostics.usingUnavailableServices)
             statusRow("Recording Active", isReady: diagnostics.recordingActive)
 
             if let errorMessage {

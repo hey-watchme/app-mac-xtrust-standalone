@@ -5,25 +5,29 @@ Date: 2026-05-08 JST
 ## Purpose
 
 Build a local-first, standalone ambient memo system that runs on a capable
-laptop and accumulates spoken knowledge without requiring a cloud backend.
+laptop and captures spoken knowledge without requiring a cloud backend.
 
 This work is a feasibility and foundation phase for the standalone line. The
 goal is not feature breadth. The goal is to prove that the local pipeline can
-run continuously, detect speech, structure captured content, and preserve it as
-knowledge.
+monitor speech, structure captured content, and preserve it as knowledge.
 
 ## Product definition
 
-The product is an always-on ambient memo application.
+The product is a local-first ambient memo application centered on one active
+session at a time.
+
+For v1, a session means one operator-opened capture window, typically one
+meeting.
 
 It should:
 
-- stay running in the background on a local machine
-- listen continuously
+- let the operator open one local session
+- monitor microphone input continuously while that session is open
 - use VAD to decide when speech is present
-- record only when speech is detected
+- record only the detected speech spans
+- persist each detected speech span as one utterance under the open session
+- group utterances into topics over time
 - transcribe detected speech locally
-- accumulate transcribed speech into progressively larger knowledge units
 - remain usable even with no network connection
 
 Assumption:
@@ -34,7 +38,49 @@ Assumption:
 
 The system has three main aggregation levels.
 
-### 1. Utterance
+### 1. Session
+
+Definition:
+
+- one operator-opened capture window
+- typically one meeting or one bounded recording activity
+- owns the topics and utterances created while it remains open
+- becomes read-mostly once the operator closes it
+
+Fields:
+
+- `session_id`
+- `started_at`
+- `ended_at`
+- `status`
+- `title` later if needed
+- `utterance_count`
+- `topic_count`
+
+### 2. Topic
+
+Definition:
+
+- a cluster of utterances within one session
+- a topic continues while the gap between utterances does not exceed the topic
+  boundary threshold
+- the initial working rule is a new topic after 1 minute of silence
+- the exact threshold remains tunable
+
+Fields:
+
+- `topic_id`
+- `session_id`
+- `started_at`
+- `ended_at`
+- `status`
+- `utterance_ids`
+- `topic_transcript`
+- `topic_summary`
+- `topic_keywords`
+- optional embedding / knowledge link fields later
+
+### 3. Utterance
 
 Definition:
 
@@ -44,6 +90,8 @@ Definition:
 Fields:
 
 - `utterance_id`
+- `session_id`
+- `topic_id` nullable until grouped
 - `started_at`
 - `ended_at`
 - `duration_seconds`
@@ -52,51 +100,24 @@ Fields:
 - `transcription_status`
 - optional quality / confidence fields later
 
-### 2. Topic
-
-Definition:
-
-- a cluster of utterances
-- a topic continues while the gap between utterances does not exceed 1 minute
-- if the silent gap exceeds 1 minute, a new topic starts
-
-Fields:
-
-- `topic_id`
-- `started_at`
-- `ended_at`
-- `utterance_ids`
-- `topic_transcript`
-- `topic_summary`
-- `topic_keywords`
-- optional embedding / knowledge link fields later
-
-### 3. Memo / Minutes
-
-Definition:
-
-- a larger operator-facing memo unit composed of multiple topics
-- the exact session boundary is a product decision and should not be hard-coded
-  too early
-- for v1, this can be a daily memo or an explicitly opened capture window
-
-Fields:
-
-- `memo_id`
-- `started_at`
-- `ended_at`
-- `topic_ids`
-- `memo_summary`
-- `export_status`
-
 ## Functional requirements
 
-### Always-on capture
+### Session lifecycle
 
-- the app can stay active for long periods
+- the operator can create one new local session
+- the operator can explicitly start listening inside that session
+- the operator can explicitly stop listening without deleting prior utterances
+- the operator can explicitly close the session to finalize the captured set
+- only one active listening session is required for v1
+
+### Continuous listening
+
+- the app can stay active for long periods while one session is open
 - the microphone input is monitored continuously
 - raw audio is not saved continuously
 - recording begins only when VAD detects speech
+- silence or non-speech is ignored instead of being saved as one continuous raw
+  file
 
 ### Utterance segmentation
 
@@ -106,9 +127,12 @@ Fields:
 
 ### Topic segmentation
 
+- topic grouping happens within one session
 - utterances separated by less than 1 minute remain in the same topic
 - utterances separated by 1 minute or more start a new topic
 - topics are updated incrementally as new utterances arrive
+- the 1-minute threshold is the first working rule, not a permanently frozen
+  product constant
 
 ### Local ASR
 
@@ -126,7 +150,7 @@ Fields:
 
 ### Knowledge accumulation
 
-- utterances, topics, and memo summaries persist locally
+- sessions, utterances, and topics persist locally
 - the local store should support later promotion into a knowledge layer
 - v1 only needs the persistence model and retrieval hooks, not a full knowledge
   UI
@@ -148,7 +172,7 @@ Fields:
 ### Observability
 
 - operator can inspect current capture state
-- operator can inspect utterance, topic, and memo states
+- operator can inspect session, topic, and utterance states
 - operator can inspect errors, model paths, and job status
 
 ### Simplicity
@@ -171,12 +195,12 @@ Fields:
 
 The first meaningful standalone proof should be:
 
-1. always-on microphone monitoring
-2. VAD-based utterance detection
-3. utterance audio save
-4. local utterance ASR
-5. topic grouping by silence-gap rule
-6. local topic summary
+1. always-on microphone monitoring inside one open session
+2. operator-opened session lifecycle
+3. VAD-based utterance detection
+4. utterance audio save
+5. local utterance ASR
+6. topic grouping by silence-gap rule
 7. local persistence and inspection UI
 
 That is the real v1. Everything else is secondary.

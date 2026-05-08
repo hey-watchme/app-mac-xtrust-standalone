@@ -41,6 +41,15 @@ struct WhisperTranscriberConfiguration: Sendable {
 struct WhisperTranscriber: Sendable {
     let configuration: WhisperTranscriberConfiguration
 
+    private static let preferredExecutableDirectories: [String] = [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        "/usr/bin",
+        "/bin",
+        "/usr/sbin",
+        "/sbin"
+    ]
+
     func transcribe(audioFilePath: String, outputDirectory: String) async throws -> TranscriptionArtifact {
         let startedAt = Date()
         let audioURL = URL(fileURLWithPath: audioFilePath)
@@ -57,8 +66,16 @@ struct WhisperTranscriber: Sendable {
             )
         }
 
+        let processEnvironment = buildProcessEnvironment()
+        guard containsExecutable(named: "ffmpeg", in: processEnvironment) else {
+            throw WhisperTranscriberError.ffmpegMissing(
+                searchedPath: processEnvironment["PATH"] ?? ""
+            )
+        }
+
         let process = Process()
         process.executableURL = URL(fileURLWithPath: configuration.executablePath)
+        process.environment = processEnvironment
         process.arguments = [
             audioFilePath,
             "--model", configuration.modelName,
@@ -92,7 +109,8 @@ struct WhisperTranscriber: Sendable {
 
         let resolvedTranscriptURL = try await waitForTranscriptFile(
             expectedURL: transcriptURL,
-            outputDirectoryURL: outputURL
+            outputDirectoryURL: outputURL,
+            processOutput: processOutput
         )
         let transcriptText = try String(contentsOf: resolvedTranscriptURL, encoding: .utf8)
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -104,13 +122,52 @@ struct WhisperTranscriber: Sendable {
         )
     }
 
+    private func buildProcessEnvironment() -> [String: String] {
+        var environment = ProcessInfo.processInfo.environment
+        let currentPathEntries = (environment["PATH"] ?? "")
+            .split(separator: ":")
+            .map(String.init)
+
+        let whisperDirectory = URL(fileURLWithPath: configuration.executablePath)
+            .deletingLastPathComponent()
+            .path(percentEncoded: false)
+
+        var mergedEntries: [String] = []
+        for entry in currentPathEntries + [whisperDirectory] + Self.preferredExecutableDirectories {
+            guard !entry.isEmpty, !mergedEntries.contains(entry) else { continue }
+            mergedEntries.append(entry)
+        }
+
+        environment["PATH"] = mergedEntries.joined(separator: ":")
+        return environment
+    }
+
+    private func containsExecutable(named executableName: String, in environment: [String: String]) -> Bool {
+        let fileManager = FileManager.default
+        let directories = (environment["PATH"] ?? "")
+            .split(separator: ":")
+            .map(String.init)
+
+        for directory in directories {
+            let candidatePath = URL(fileURLWithPath: directory, isDirectory: true)
+                .appending(path: executableName)
+                .path(percentEncoded: false)
+            if fileManager.isExecutableFile(atPath: candidatePath) {
+                return true
+            }
+        }
+
+        return false
+    }
+
     private func waitForProcessToFinish(
         process: Process,
         stdoutPipe: Pipe,
         stderrPipe: Pipe
     ) async throws -> ProcessOutput {
         try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { process in
+            DispatchQueue.global(qos: .userInitiated).async {
+                process.waitUntilExit()
                 let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
                 let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
                 let outputText = String(data: stdoutData, encoding: .utf8)?
@@ -129,48 +186,62 @@ struct WhisperTranscriber: Sendable {
 
     private func waitForTranscriptFile(
         expectedURL: URL,
-        outputDirectoryURL: URL
+        outputDirectoryURL: URL,
+        processOutput: ProcessOutput
     ) async throws -> URL {
-        for attempt in 0..<20 {
+        for attempt in 0..<60 {
             if FileManager.default.fileExists(atPath: expectedURL.path(percentEncoded: false)) {
                 return expectedURL
             }
 
-            if attempt < 19 {
-                try await Task.sleep(for: .milliseconds(150))
+            if attempt < 59 {
+                try await Task.sleep(for: .milliseconds(250))
             }
         }
 
-        let availableTextFiles = (try? FileManager.default.contentsOfDirectory(
+        let availableTextFiles = try FileManager.default.contentsOfDirectory(
             at: outputDirectoryURL,
             includingPropertiesForKeys: nil
-        ))?
+        )
             .filter { $0.pathExtension == "txt" }
             .map(\.lastPathComponent)
-            .sorted() ?? []
+            .sorted()
 
         throw WhisperTranscriberError.transcriptMissing(
             expectedPath: expectedURL.path(percentEncoded: false),
             outputDirectory: outputDirectoryURL.path(percentEncoded: false),
-            availableFiles: availableTextFiles
+            availableFiles: availableTextFiles,
+            processOutput: processOutput.outputText,
+            processError: processOutput.errorText
         )
     }
 }
 
 enum WhisperTranscriberError: LocalizedError {
     case modelMissing(expectedPath: String)
+    case ffmpegMissing(searchedPath: String)
     case processFailed(code: Int32, message: String)
-    case transcriptMissing(expectedPath: String, outputDirectory: String, availableFiles: [String])
+    case transcriptMissing(
+        expectedPath: String,
+        outputDirectory: String,
+        availableFiles: [String],
+        processOutput: String?,
+        processError: String?
+    )
 
     var errorDescription: String? {
         switch self {
         case let .modelMissing(expectedPath):
             return "Whisper model is missing. Place `small.pt` at: \(expectedPath)"
+        case let .ffmpegMissing(searchedPath):
+            return "ffmpeg is required for Whisper audio loading, but it was not found in PATH. PATH: \(searchedPath)"
         case let .processFailed(code, message):
             return "Whisper failed (\(code)): \(message)"
-        case let .transcriptMissing(expectedPath, outputDirectory, availableFiles):
+        case let .transcriptMissing(expectedPath, outputDirectory, availableFiles, processOutput, processError):
             let fileList = availableFiles.isEmpty ? "(none)" : availableFiles.joined(separator: ", ")
-            return "Whisper finished but transcript file was not found. Expected: \(expectedPath). Output directory: \(outputDirectory). Available files: \(fileList)"
+            let stdoutSection = processOutput?.isEmpty == false ? " Stdout: \(processOutput!)." : ""
+            let stderrSection = processError?.isEmpty == false ? " Stderr: \(processError!)." : ""
+            return "Whisper finished but transcript file was not found. Expected: \(expectedPath). Output directory: \(outputDirectory). Available files: \(fileList).\(stdoutSection)\(stderrSection)"
         }
     }
 }

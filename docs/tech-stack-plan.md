@@ -104,7 +104,7 @@ Why:
 
 ### Packaging and runtime layout
 
-- ship the macOS app separately from the Android apps
+- ship the macOS app as its own product artifact
 - package the UI as a signed macOS `.app`
 - plan for `Developer ID` signing and notarization before distribution
 - keep models outside the app bundle
@@ -121,14 +121,17 @@ Why:
 
 ```text
 SwiftUI app
-  -> capture mic audio to wav
-  -> enqueue local transcription job
+  -> operator opens one session
+  -> app monitors mic input while session is active
+  -> VAD detects speech spans
+  -> save one wav per utterance
+  -> enqueue local transcription job per utterance
   -> run whisper.cpp sidecar on saved audio
-  -> persist transcript to SQLite
-  -> enqueue summary job
-  -> run llama.cpp sidecar on selected transcript text
-  -> persist summary to SQLite
-  -> show session timeline and wrap-up result
+  -> persist utterances and transcripts to SQLite
+  -> group utterances into topics
+  -> run llama.cpp sidecar on topic text
+  -> persist topic summaries to SQLite
+  -> show session timeline and topic cards
 ```
 
 This is intentionally file-based and batch-oriented.
@@ -206,29 +209,29 @@ sessions
   started_at
   ended_at
   status
-  audio_path
-  transcript_path
-  summary_path
+  utterance_count
+  topic_count
   created_at
 
-transcripts
+topics
   id
   session_id
-  source
-  text
-  language
-  model
+  started_at
+  ended_at
+  status
+  summary_text
+  created_at
+
+utterances
+  id
+  session_id
+  topic_id
+  started_at
+  ended_at
   duration_ms
-  created_at
-
-summaries
-  id
-  session_id
-  title
-  bullets
-  summary
-  model
-  prompt_version
+  audio_path
+  transcript_text
+  transcription_status
   created_at
 ```
 
@@ -245,28 +248,38 @@ summaries
 - set up Application Support directories
 - set up SQLite schema and session history
 
-### Phase 2: Local recording and ASR
+### Phase 2: Session runtime and utterance capture
 
-- capture microphone input
-- save wav files locally
-- transcribe them with `whisper.cpp`
-- display transcript results and metrics
+- create one active session lifecycle
+- monitor microphone input
+- detect utterances with VAD
+- save one wav per utterance
+- display utterance cards and capture metrics
 
-### Phase 3: Local summarization
+### Phase 3: Local utterance ASR
 
-- define one wrap-up prompt contract
-- summarize saved transcript text with `llama.cpp`
-- persist and display the result
+- transcribe saved utterances with `whisper.cpp`
+- persist transcript results and status
+- show transcript text in the utterance flow
 
-### Phase 4: Operator workflow hardening
+### Phase 4: Topic formation and summarization
 
+- group utterances into topics
+- define one topic summary prompt contract
+- summarize topic text with `llama.cpp`
+- persist and display topic summaries
+
+### Phase 5: Operator workflow hardening
+
+- define explicit session close behavior
 - add retry and failure states
-- add export to Markdown or text
+- add export for one closed session
 - add model-path validation and diagnostics
 
 ## Exit criteria for v1
 
 - app runs on macOS without requiring a cloud API
-- one meeting recording can be captured, transcribed, summarized, and saved
+- one session can capture multiple utterances, group them into topics, and save
+  them locally
 - local data remains inspectable on disk
 - common failure states are visible and recoverable

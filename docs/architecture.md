@@ -1,25 +1,225 @@
 # Mac Local-First Architecture
 
-Date: 2026-05-07 JST
+Date: 2026-05-08 JST
 
 ## Objective
 
-Fix a minimal architecture boundary before implementation starts.
+Define the architecture before adding more behavior.
 
-The intent is to keep the macOS UI thin, keep logic testable, and isolate heavy
-local inference work from the main app process as much as practical.
+The app must make the local pipeline predictable. Recording, ASR, topic
+formation, and summarization should each have clear ownership, explicit input
+and output contracts, and persisted state transitions.
 
-## High-level shape
+Error handling policy:
+
+- do not hide startup or runtime failures behind fallback workspaces
+- do not substitute unavailable services with silent placeholders
+- surface the real error to the operator together with the failed contract
+- use diagnostics to explain the failure, not to continue past it invisibly
+
+The immediate design target is not VAD quality or summary quality. The target
+is a reliable artifact pipeline:
 
 ```text
-XTrustMacApp (SwiftUI macOS app)
-  -> AppRuntime (dependency wiring only)
-    -> AppCore (pure Swift package)
-      -> SQLite / filesystem / sidecar wrappers
-        -> whisper.cpp / llama.cpp
+session
+  -> utterance recording artifact
+  -> transcription job
+  -> transcript artifact
+  -> topic assignment
+  -> topic summary job
 ```
 
-## Layers
+## Current design problem
+
+The current scaffold grew from a manual demo path:
+
+```text
+press Start Recording
+  -> write one wav file on the session
+press Stop Recording
+  -> mark the session completed
+press Transcribe Recording
+  -> run Whisper directly from the UI state path
+  -> look for a txt file in the shared transcripts directory
+```
+
+That shape is useful for a smoke test, but it is not a production design.
+
+The weak points are:
+
+- `Session` is doing too much: it is both the meeting container and the single
+  recording/transcription target.
+- UI actions directly trigger long-running side effects without a durable job
+  boundary.
+- ASR output is written into a shared final directory, so old output can confuse
+  diagnosis.
+- The app assumes a transcript path before the ASR job has produced and
+  validated the artifact.
+- stdout, stderr, exit code, duration, input path, and output files are not
+  persisted as first-class job evidence.
+
+This is why recent debugging became narrow and reactive. The code did not give
+us a stable state machine to inspect. It only gave us a button path and an error
+string after the fact.
+
+## Domain model
+
+### Session
+
+Top-level capture container.
+
+Responsibilities:
+
+- owns topics and utterances
+- represents one operator-opened meeting or capture window
+- tracks lifecycle: `draft`, `listening`, `paused`, `closed`, `failed`
+
+Keep out:
+
+- individual audio file paths
+- individual transcript text
+- raw ASR process details
+
+### Topic
+
+Cluster of utterances inside one session.
+
+Responsibilities:
+
+- owns a contiguous or semantically grouped subset of utterances
+- tracks summary status
+- stores topic-level summary artifacts
+
+Keep out:
+
+- microphone capture state
+- per-utterance transcription process details
+
+### Utterance
+
+Smallest persisted speech unit.
+
+Responsibilities:
+
+- points to one finalized audio artifact
+- owns transcription lifecycle
+- can later be assigned to a topic
+
+Lifecycle:
+
+```text
+detected
+  -> recording
+  -> recorded
+  -> transcriptionQueued
+  -> transcribing
+  -> transcribed
+  -> failed
+```
+
+Rules:
+
+- an utterance cannot be transcribed until its audio artifact is finalized
+- an utterance transcription failure must not corrupt the session
+- retrying ASR creates a new job attempt, not an overwrite of history
+
+## Artifact model
+
+Artifacts are files that have passed validation and can be referenced from
+SQLite.
+
+### Recording artifact
+
+Created only after recording has stopped and the file has been verified.
+
+Required metadata:
+
+- `artifact_id`
+- `utterance_id`
+- final `audio_file_path`
+- byte size
+- duration
+- sample rate
+- channel count
+- created timestamp
+
+Validation:
+
+- file exists
+- file size is greater than zero
+- duration is greater than the minimum useful utterance duration
+- file path is inside the app-managed workspace
+
+### Transcript artifact
+
+Created only after a transcription job has produced and validated text.
+
+Required metadata:
+
+- `artifact_id`
+- `utterance_id`
+- final `transcript_file_path`
+- text
+- model identifier
+- language
+- created timestamp
+
+Validation:
+
+- transcript file exists
+- transcript text can be read as UTF-8
+- transcript output belongs to the current job workspace
+
+## Job model
+
+Any long-running or fallible operation must be represented as a job.
+
+### Transcription job
+
+Input:
+
+- one finalized recording artifact
+- one model configuration
+- one dedicated job working directory
+
+Output:
+
+- one transcript artifact on success
+- one failed job record on failure
+
+Execution contract:
+
+```text
+create job directory
+  -> run ASR sidecar with job directory as output_dir
+  -> wait for process completion
+  -> capture stdout, stderr, exit code, and duration
+  -> inspect only the job directory
+  -> require exactly one txt output for the input audio
+  -> move validated transcript to final transcript storage
+  -> update utterance transcription state
+```
+
+Rules:
+
+- sidecars must not write directly to final artifact directories
+- shared final directories are storage locations, not job workspaces
+- stdout and stderr are diagnostic artifacts and should be retained for failed
+  jobs
+- process success is not enough; output validation is mandatory
+- if validation or process setup fails, show that failure directly instead of
+  falling back to a weaker path
+
+## Layering
+
+```text
+XTrustMacApp
+  -> AppRuntime
+    -> AppCore
+      -> Ports
+        -> Infrastructure adapters
+          -> SQLite / filesystem / sidecar processes
+```
 
 ### `XTrustMacApp`
 
@@ -28,134 +228,104 @@ Responsibilities:
 - app entry point
 - window and navigation structure
 - macOS permission handling
-- dependency wiring
 - operator-facing screens and status
-- presentation state only
+- dispatch user intents to application services
 
 Keep out:
 
-- direct SQL logic
-- workspace bootstrap logic
-- prompt construction details
-- raw process execution details
-- transcript and summary business rules
+- SQL
+- raw process execution
+- path naming rules
+- ASR output validation
+- domain state transitions
 
 ### `AppRuntime`
 
 Responsibilities:
 
 - bootstrap `WorkspacePaths`
-- initialize the SQLite store
-- wire infrastructure adapters into `AppCore`
-- return one stable runtime object to the UI layer
+- initialize infrastructure adapters
+- wire stores, artifact services, and job runners into AppCore services
 
 Keep out:
 
 - SwiftUI view logic
-- session state transitions
-- direct transcript or summary business rules
+- business state transitions
+- ASR prompt or output rules
 
 ### `AppCore`
 
 Responsibilities:
 
-- domain models such as `Session`, `Transcript`, and `Summary`
-- session state transitions on domain entities
-- application services such as `SessionService`
-- ports for storage, audio capture, transcription, summarization, and clock
-- testable state transitions and validation rules
+- `Session`, `Topic`, `Utterance`
+- artifact metadata models
+- job models and state transitions
+- application services for session lifecycle, recording completion,
+  transcription scheduling, and topic assignment
+- ports for storage, filesystem artifacts, sidecars, and clock
 
 Keep out:
 
 - `SwiftUI`
 - `AppKit`
-- hard-coded file locations tied to one machine
+- hard-coded user-specific paths
+- direct `Process` usage
 
 ### Infrastructure adapters
 
 Responsibilities:
 
 - SQLite-backed stores
-- application-support path resolution
+- app workspace path resolution
+- atomic file movement
 - sidecar process execution
-- local artifact file management
+- artifact validation
 
-Adapters should implement `AppCore` ports and remain replaceable.
+Adapters must implement AppCore ports and remain replaceable.
 
-### Sidecar runtimes
+## Required ports
 
-Responsibilities:
+The next implementation should introduce these boundaries before adding more
+product behavior:
 
-- `whisper.cpp` execution for file-based ASR
-- `llama.cpp` execution for transcript summarization
+- `SessionStore`
+- `TopicStore`
+- `UtteranceStore`
+- `RecordingArtifactStore`
+- `TranscriptionJobStore`
+- `ArtifactFileStore`
+- `Transcriber`
+- `ProcessRunner`
+- `Clock`
+
+## Sidecar rules
+
+Sidecars are external programs such as Whisper and later llama.cpp.
 
 Rules:
 
-- do not bundle models into source control
-- capture stdout, stderr, exit code, and duration
-- treat inference failures as normal job outcomes, not crashes
+- do not execute sidecars from UI code
+- do not let sidecars write directly into final artifact directories
+- do not infer success from exit code alone
+- capture command, arguments, stdout, stderr, exit code, duration, input files,
+  and generated output files
+- make every failed sidecar run inspectable after app restart
 
-## First implementation boundary
+## First design milestone
 
-Start with the smallest split that still helps testing:
-
-- `XTrustMacApp/` for UI and wiring
-- `Packages/AppCore/` for pure logic and protocols
-- `Tests/` for unit and integration coverage
-
-Do not over-abstract beyond this until the first vertical slice is working.
-
-## Recommended repository skeleton
+Before more VAD or topic work, implement the predictable ASR job boundary:
 
 ```text
-XTrustMacApp/
-  App/
-  Features/
-  Shared/
-  Resources/
-Packages/
-  AppCore/
-    Sources/
-    Tests/
-Tests/
-  AppCoreIntegrationTests/
-  XTrustMacUITests/
-Fixtures/
-  audio/
-  transcripts/
-  summaries/
-ThirdParty/
-scripts/
+existing wav fixture
+  -> TranscriptionJob
+  -> isolated job directory
+  -> validated transcript artifact
+  -> persisted utterance transcription state
 ```
 
-## Dependency direction
+Exit criteria:
 
-Keep the dependency flow one-way:
-
-```text
-XTrustMacApp -> AppRuntime -> AppCore -> Ports -> Infrastructure/Sidecars
-```
-
-`AppCore` must not depend on the macOS UI layer.
-
-## Fake-first rule
-
-Before wiring real `whisper.cpp` or `llama.cpp`, start with fake adapters for:
-
-- transcriber
-- summarizer
-- audio capture where useful
-
-This allows:
-
-- unit tests for flow control
-- integration tests for persistence
-- UI progress without model binaries being ready
-
-## Initial non-goals
-
-- streaming ASR
-- live token streaming
-- RAG
-- cross-device sync
-- multi-user workflows
+- the same fixture wav produces the same transcript artifact path every time
+- stale files in `transcripts/` cannot affect job success or failure
+- failures preserve enough evidence to explain what happened without rerunning
+  the app

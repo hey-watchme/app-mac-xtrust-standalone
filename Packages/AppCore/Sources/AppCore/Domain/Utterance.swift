@@ -1,13 +1,6 @@
 import Foundation
 
-public struct Session: Identifiable, Equatable, Sendable {
-    public enum Status: String, Codable, Equatable, Sendable {
-        case draft
-        case recording
-        case completed
-        case failed
-    }
-
+public struct Utterance: Identifiable, Equatable, Sendable {
     public enum TranscriptionStatus: String, Codable, Equatable, Sendable {
         case idle
         case running
@@ -16,104 +9,77 @@ public struct Session: Identifiable, Equatable, Sendable {
     }
 
     public let id: UUID
+    public let sessionID: UUID
+    public let topicID: UUID?
     public let startedAt: Date
     public let endedAt: Date?
-    public let status: Status
-    public let audioFilePath: String?
     public let durationSeconds: Double?
+    public let audioFilePath: String?
     public let transcriptText: String?
     public let transcriptFilePath: String?
     public let transcriptionStatus: TranscriptionStatus
     public let transcriptionError: String?
     public let transcriptionDurationSeconds: Double?
-    public let utteranceCount: Int
-    public let topicCount: Int
 
     public init(
         id: UUID = UUID(),
+        sessionID: UUID,
+        topicID: UUID? = nil,
         startedAt: Date,
         endedAt: Date? = nil,
-        status: Status = .draft,
-        audioFilePath: String? = nil,
         durationSeconds: Double? = nil,
+        audioFilePath: String? = nil,
         transcriptText: String? = nil,
         transcriptFilePath: String? = nil,
         transcriptionStatus: TranscriptionStatus = .idle,
         transcriptionError: String? = nil,
-        transcriptionDurationSeconds: Double? = nil,
-        utteranceCount: Int = 0,
-        topicCount: Int = 0
+        transcriptionDurationSeconds: Double? = nil
     ) {
         self.id = id
+        self.sessionID = sessionID
+        self.topicID = topicID
         self.startedAt = startedAt
         self.endedAt = endedAt
-        self.status = status
-        self.audioFilePath = audioFilePath
         self.durationSeconds = durationSeconds
+        self.audioFilePath = audioFilePath
         self.transcriptText = transcriptText
         self.transcriptFilePath = transcriptFilePath
         self.transcriptionStatus = transcriptionStatus
         self.transcriptionError = transcriptionError
         self.transcriptionDurationSeconds = transcriptionDurationSeconds
-        self.utteranceCount = utteranceCount
-        self.topicCount = topicCount
     }
 
-    public func recordingStarted(audioFilePath: String) -> Session {
-        Session(
+    public func assigned(to topicID: UUID) -> Utterance {
+        Utterance(
             id: id,
-            startedAt: startedAt,
-            endedAt: nil,
-            status: .recording,
-            audioFilePath: audioFilePath,
-            durationSeconds: nil,
-            transcriptText: nil,
-            transcriptFilePath: nil,
-            transcriptionStatus: .idle,
-            transcriptionError: nil,
-            transcriptionDurationSeconds: nil,
-            utteranceCount: utteranceCount,
-            topicCount: topicCount
-        )
-    }
-
-    public func recordingCompleted(
-        endedAt: Date,
-        audioFilePath: String,
-        durationSeconds: Double
-    ) -> Session {
-        Session(
-            id: id,
+            sessionID: sessionID,
+            topicID: topicID,
             startedAt: startedAt,
             endedAt: endedAt,
-            status: .completed,
-            audioFilePath: audioFilePath,
             durationSeconds: durationSeconds,
+            audioFilePath: audioFilePath,
             transcriptText: transcriptText,
             transcriptFilePath: transcriptFilePath,
             transcriptionStatus: transcriptionStatus,
             transcriptionError: transcriptionError,
-            transcriptionDurationSeconds: transcriptionDurationSeconds,
-            utteranceCount: utteranceCount,
-            topicCount: topicCount
+            transcriptionDurationSeconds: transcriptionDurationSeconds
         )
     }
 
-    public func transcriptionStarted() -> Session {
-        Session(
+    public func transcriptionStarted() -> Utterance {
+        Utterance(
             id: id,
+            sessionID: sessionID,
+            topicID: topicID,
             startedAt: startedAt,
             endedAt: endedAt,
-            status: status,
-            audioFilePath: audioFilePath,
             durationSeconds: durationSeconds,
+            audioFilePath: audioFilePath,
             transcriptText: transcriptText,
             transcriptFilePath: transcriptFilePath,
             transcriptionStatus: .running,
             transcriptionError: nil,
-            transcriptionDurationSeconds: nil,
-            utteranceCount: utteranceCount,
-            topicCount: topicCount
+            transcriptionDurationSeconds: nil
         )
     }
 
@@ -121,39 +87,37 @@ public struct Session: Identifiable, Equatable, Sendable {
         transcriptText: String,
         transcriptFilePath: String,
         durationSeconds: Double
-    ) -> Session {
-        Session(
+    ) -> Utterance {
+        Utterance(
             id: id,
+            sessionID: sessionID,
+            topicID: topicID,
             startedAt: startedAt,
             endedAt: endedAt,
-            status: status,
-            audioFilePath: audioFilePath,
             durationSeconds: self.durationSeconds,
+            audioFilePath: audioFilePath,
             transcriptText: transcriptText,
             transcriptFilePath: transcriptFilePath,
             transcriptionStatus: .completed,
             transcriptionError: nil,
-            transcriptionDurationSeconds: durationSeconds,
-            utteranceCount: utteranceCount,
-            topicCount: topicCount
+            transcriptionDurationSeconds: durationSeconds
         )
     }
 
-    public func transcriptionFailed(message: String) -> Session {
-        Session(
+    public func transcriptionFailed(message: String) -> Utterance {
+        Utterance(
             id: id,
+            sessionID: sessionID,
+            topicID: topicID,
             startedAt: startedAt,
             endedAt: endedAt,
-            status: status,
-            audioFilePath: audioFilePath,
             durationSeconds: durationSeconds,
+            audioFilePath: audioFilePath,
             transcriptText: transcriptText,
             transcriptFilePath: transcriptFilePath,
             transcriptionStatus: .failed,
             transcriptionError: message,
-            transcriptionDurationSeconds: transcriptionDurationSeconds,
-            utteranceCount: utteranceCount,
-            topicCount: topicCount
+            transcriptionDurationSeconds: transcriptionDurationSeconds
         )
     }
 }
