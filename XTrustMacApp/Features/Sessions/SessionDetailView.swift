@@ -16,6 +16,7 @@ struct SessionDetailView: View {
     let onTranscribeUtterance: (UUID) -> Void
     let onSummarizeTopic: (UUID) -> Void
     let onSetSessionStatus: (Session.Status) -> Void
+    let onSetMeetingContextProfile: (Session.MeetingContextProfile) -> Void
     let onSummarizeMeeting: () -> Void
     let onCopyWrapUp: () -> Void
     let meetingSummaryText: String?
@@ -171,6 +172,17 @@ struct SessionDetailView: View {
             .disabled(isSummarizingMeeting)
 
             Spacer()
+
+            Picker("会議プロファイル", selection: Binding(
+                get: { session.meetingContextProfile },
+                set: { onSetMeetingContextProfile($0) }
+            )) {
+                ForEach(Session.MeetingContextProfile.allCases, id: \.self) { profile in
+                    Text(meetingContextProfileLabel(profile)).tag(profile)
+                }
+            }
+            .pickerStyle(.menu)
+            .controlSize(.small)
 
             Picker("", selection: Binding(
                 get: { session.status },
@@ -371,6 +383,19 @@ struct SessionDetailView: View {
         f.locale = Locale(identifier: "ja_JP")
         f.dateFormat = "M月d日（E） H:mm の会議"
         return f.string(from: date)
+    }
+
+    private func meetingContextProfileLabel(_ profile: Session.MeetingContextProfile) -> String {
+        switch profile {
+        case .general:
+            return "一般会議"
+        case .engineering:
+            return "開発"
+        case .product:
+            return "企画・プロダクト"
+        case .recruitingHR:
+            return "採用・人事"
+        }
     }
 
     private func formatDuration(_ seconds: Double) -> String {

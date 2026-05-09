@@ -65,4 +65,13 @@ public struct SessionService: Sendable {
         return updated
     }
 
+    public func setMeetingContextProfile(
+        _ profile: Session.MeetingContextProfile,
+        for session: Session
+    ) throws -> Session {
+        let updated = session.withMeetingContextProfile(profile)
+        try sessionStore.updateSession(updated)
+        return updated
+    }
+
 }

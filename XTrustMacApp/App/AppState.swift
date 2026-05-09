@@ -253,7 +253,8 @@ final class AppState: ObservableObject {
 
     func summarizeTopic(topicID: UUID) async {
         guard let sessionID = selectedSessionID,
-              let topic = selectedSessionDetail?.topics.first(where: { $0.id == topicID }) else {
+              let detail = selectedSessionDetail,
+              let topic = detail.topics.first(where: { $0.id == topicID }) else {
             errorMessage = "Topic not found."
             return
         }
@@ -261,7 +262,10 @@ final class AppState: ObservableObject {
             errorMessage = nil
             startSummaryRefreshLoop(selecting: sessionID)
             defer { stopSummaryRefreshLoop() }
-            try await topicSummaryRunner.run(topic: topic)
+            try await topicSummaryRunner.run(
+                topic: topic,
+                contextProfile: detail.session.meetingContextProfile
+            )
             try reloadSessions(selecting: sessionID)
         } catch {
             try? reloadSessions(selecting: sessionID)
@@ -284,10 +288,25 @@ final class AppState: ObservableObject {
         }
     }
 
+    func setMeetingContextProfile(_ profile: Session.MeetingContextProfile) {
+        guard let session = selectedSession else { return }
+        do {
+            let updated = try sessionService.setMeetingContextProfile(profile, for: session)
+            if let index = sessions.firstIndex(where: { $0.id == updated.id }) {
+                sessions[index] = updated
+            }
+            refreshSelectedSessionDetail()
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func wrapUpText(for detail: SessionDetailSnapshot) -> String {
         var lines: [String] = []
         let startStr = detail.session.startedAt.formatted(.dateTime.year().month().day().hour().minute())
         lines.append("# Session — \(startStr)")
+        lines.append("Context Profile: \(detail.session.meetingContextProfile.rawValue)")
         lines.append("")
 
         for (index, topic) in detail.topics.enumerated() {
@@ -393,7 +412,12 @@ final class AppState: ObservableObject {
         isSummarizingMeeting = true
         errorMessage = nil
         do {
-            meetingSummaryText = try await gemmaSummarizer.summarize(transcripts: topicSummaries)
+            let request = SummarizationRequest(
+                scope: .meeting,
+                contextProfile: detail.session.meetingContextProfile,
+                transcripts: topicSummaries
+            )
+            meetingSummaryText = try await gemmaSummarizer.summarize(request: request)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -426,4 +450,3 @@ struct UtteranceDetailSnapshot: Identifiable {
         transcriptArtifacts.last
     }
 }
-

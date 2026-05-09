@@ -8,13 +8,17 @@ infrastructure.
 
 ## Current status
 
-This project now has a Milestone 1 scaffold:
+This project has completed the first end-to-end local meeting notes vertical
+slice through Milestone 7:
 
 - a real macOS Xcode project at `XTrustMacApp.xcodeproj`
-- a minimal macOS `SwiftUI` app target at `XTrustMacApp/`
+- a native `SwiftUI` app target at `XTrustMacApp/`
 - a testable core library as a local package at `Packages/AppCore/`
-- baseline unit and integration tests for workspace bootstrap and session
-  persistence
+- local SQLite persistence for sessions, utterances, topics, jobs, and summary
+  state
+- end-to-end capture -> transcription -> topic summary -> session wrap-up
+- baseline unit and integration tests for workspace bootstrap, persistence, and
+  job flows
 
 Technical stack and implementation planning are tracked in:
 
@@ -23,6 +27,7 @@ Technical stack and implementation planning are tracked in:
 - `docs/milestones.md`
 - `docs/testing-strategy.md`
 - `docs/design-system.md`
+- `docs/manual-verification.md`
 
 ## Why this project exists
 
@@ -185,15 +190,17 @@ Implemented so far:
   gap rule
 - `Summarizer` port and `TopicSummaryRunner` for per-topic local LLM
   summarization
-- `LiteRTLMSummarizer` adapter — calls `litert-lm run` as a subprocess with
-  `--backend gpu`, following the same Process + Pipe pattern as
-  `WhisperCLITranscriber`
-- `Gemma 4 E4B` running locally via LiteRT-LM (`gemma-4-E4B-it.litertlm`,
-  3.4 GB, int4-quantized); end-to-end Japanese meeting summary confirmed
+- `MLXSummarizer` adapter — calls `python3 -m mlx_vlm generate` as a subprocess
+  with a local model directory under `models/gemma4-mlx/`
+- `Gemma 4 E4B` running locally via MLX / `mlx_vlm`
+  (`mlx-community/gemma-4-e4b-it-4bit`, ~4.86 GB, 4bit); end-to-end Japanese
+  meeting summary confirmed
 - `Session.Status.closed` + `SessionService.closeSession()`
 - per-topic `Summarize` button, summary status badge, and summary text display
 - `Close Session` button and `Copy Wrap-Up` (Markdown to clipboard)
 - Diagnostics screen shows Whisper and Gemma 4 model paths and ready status
+- old one-shot recording path removed from `AppState`; VAD capture is the
+  primary recording flow
 - UI design system (`XT` token namespace, custom components, Ambient Memo concept)
   — see `docs/design-system.md`
 
@@ -202,9 +209,9 @@ Current verification:
 - `swift build`
 - `swift test` — 25 tests pass
 - `xcodebuild -project XTrustMacApp.xcodeproj -scheme XTrustMacApp build`
-- manual flow: create session → start VAD capture → speak → silence 3s →
-  utterance created → transcribe (Whisper) → summarize topic (Gemma 4 E4B) →
-  close session → copy wrap-up
+- manual flow: create session -> start VAD capture -> speak -> silence 3s ->
+  utterance created -> transcribe locally (Whisper) -> summarize topic
+  locally (Gemma 4 E4B via MLX) -> close session -> copy wrap-up
 
 Open in Xcode:
 
@@ -227,7 +234,8 @@ first use. Exact paths are shown in the app under `Diagnostics`.
 
 ### Whisper (ASR)
 
-Install the `whisper` Python package and place the model file at:
+Install the `whisper` Python package and ensure `ffmpeg` is available in
+`PATH`. Place the model file at:
 
 - `~/Library/Application Support/XTrust/com.xtrust.mac-local-first/models/whisper/small.pt`
 
@@ -235,13 +243,21 @@ Diagnostics keys: `Whisper Model` / `Whisper Model Ready`
 
 ### Gemma 4 E4B (local LLM summarization)
 
-Install `litert-lm` and download the model:
+Install Apple Silicon native `python3`, `mlx-vlm`, and download the model:
 
 ```bash
-pip install litert-lm
-hf download litert-community/gemma-4-E4B-it-litert-lm gemma-4-E4B-it.litertlm \
-  --local-dir "$HOME/Library/Application Support/XTrust/com.xtrust.mac-local-first/models/gemma4/"
+pip install mlx-lm mlx-vlm
+hf download mlx-community/gemma-4-e4b-it-4bit \
+  --local-dir "$HOME/Library/Application Support/XTrust/com.xtrust.mac-local-first/models/gemma4-mlx/"
 ```
+
+- use native arm64 `python3` on Apple Silicon; Rosetta-based Python is not
+  supported for this path
+- the app resolves a local model directory at
+  `~/Library/Application Support/XTrust/com.xtrust.mac-local-first/models/gemma4-mlx/`
+  rather than a single model file
+- summarization is invoked as `python3 -m mlx_vlm generate ...` from
+  `MLXSummarizer`
 
 Diagnostics keys: `Gemma 4 Model` / `Gemma 4 Model Ready`
 
@@ -252,17 +268,23 @@ direct local-path error instead of attempting a network download.
 
 The vertical path through Milestone 7 is complete end-to-end.
 
-The next planned improvement is to replace `LiteRTLMSummarizer` with an
-MLX-based adapter for better Apple Silicon utilization:
+The most concrete next candidates are:
 
-- see `docs/mlx-migration-plan.md` for the full migration plan
-- model: `mlx-community/gemma-4-e4b-it-4bit` via `mlx_lm.generate`
-- implementation delta is minimal (subprocess executable + arguments only)
+- multimodal expansion: whiteboard capture via MLX vision input
+- meeting ASR / multimodal experiments using Gemma 4 audio-capable tooling
+- optional cleanup: inline microphone permission handling into
+  `AVAudioCaptureController` and remove `MicrophoneRecorder`
 
-Before the next coding session, use these documents as the source of truth:
+Current project state should be read as:
 
-- `docs/next-session-handoff.md`
-- `docs/mlx-migration-plan.md`
+- Milestones 0-7: complete for the PoC
+- Milestone 8: partially satisfied by the current SQLite schema and stable IDs
+- Milestone 9: partially satisfied by retryable jobs, diagnostics, and restart
+  persistence; longer-run hardening remains open
+
+Use these documents as the source of truth:
+
 - `docs/milestones.md`
-- `docs/implementation-plan.md`
 - `docs/architecture.md`
+- `docs/manual-verification.md`
+- `docs/summarization-prompt-design.md`

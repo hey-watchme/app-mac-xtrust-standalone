@@ -60,12 +60,12 @@ struct MLXSummarizer: Summarizer, Sendable {
         "/bin",
     ]
 
-    func summarize(transcripts: [String]) async throws -> String {
+    func summarize(request: SummarizationRequest) async throws -> String {
         guard configuration.modelReady else {
             throw MLXSummarizerError.modelMissing(expectedPath: configuration.modelDirectory)
         }
 
-        let prompt = buildPrompt(transcripts: transcripts)
+        let prompt = buildPrompt(for: request)
         let result = try await runProcess(prompt: prompt)
 
         guard result.exitCode == 0 else {
@@ -83,25 +83,117 @@ struct MLXSummarizer: Summarizer, Sendable {
         return parseOutput(raw)
     }
 
-    private func buildPrompt(transcripts: [String]) -> String {
-        let numbered = transcripts.enumerated()
+    private func buildPrompt(for request: SummarizationRequest) -> String {
+        let numbered = request.transcripts.enumerated()
             .map { "[\($0.offset + 1)] \($0.element)" }
             .joined(separator: "\n")
 
-        return """
-        以下の会議の発話記録を日本語で簡潔に要約してください。
+        let sourceLabel: String
+        let taskInstruction: String
+        let outputFormat: String
 
-        ## 発話記録
+        switch request.scope {
+        case .topic:
+            sourceLabel = "発話記録"
+            taskInstruction = """
+            以下は会議中の1トピックに属する発話記録です。会話の言い換えではなく、業務で再利用できる実務メモとして整理してください。
+            """
+            outputFormat = """
+            **トピック**: この話題が何についての議論かを1文で
+            **決定事項**:
+            - 決まったことを箇条書き
+            **未決事項**:
+            - 保留・確認待ち・論点だけ出て未決の項目
+            **アクション**:
+            - 次のステップ、担当、期限。聞き取れない場合は「要確認」と書く
+            **リスク・懸念**:
+            - ブロッカー、依存関係、懸念点。なければ「なし」
+            """
+        case .meeting:
+            sourceLabel = "トピック要約"
+            taskInstruction = """
+            以下は会議内の各トピック要約です。重複をまとめ、会議全体の流れと実務上の結論が分かる wrap-up を作ってください。
+            """
+            outputFormat = """
+            **会議サマリー**: 会議全体の要旨を2〜3文で
+            **決定事項**:
+            - 会議全体として確定した事項
+            **未決事項**:
+            - 持ち越し、追加確認、判断保留
+            **アクション**:
+            - 担当・期限付きで書けるものを優先。曖昧なら「要確認」
+            **フォローアップ観点**:
+            - 次回までに見落とすと危ない点や確認したい論点
+            """
+        }
+
+        return """
+        あなたは日本語の業務会議メモ作成アシスタントです。
+
+        以下のルールを守ってください。
+        - 事実ベースで要約する
+        - 発言に根拠がない推測は書かない
+        - 決定事項と未決事項を分ける
+        - 担当者名や期限が不明な場合は断定せず「要確認」と書く
+        - 冗長な前置きや感想は書かない
+        - 日本語の社内メモとしてそのまま読める形にする
+
+        会議コンテキスト:
+        \(contextDescription(for: request.contextProfile))
+
+        優先して抽出する観点:
+        \(extractionPriorities(for: request.contextProfile))
+
+        \(taskInstruction)
+
+        ## 入力 (\(sourceLabel))
         \(numbered)
 
-        ## 出力形式（以下の構造で回答してください）
-        **テーマ**: このトピックの主な議題を1文で
-        **要点**:
-        - 重要なポイントを箇条書きで3〜5点
-        **アクション**: 決定事項や次のステップ（なければ「なし」）
-
-        要約のみ出力し、前置きや説明は不要です。
+        ## 出力形式
+        \(outputFormat)
         """
+    }
+
+    private func contextDescription(for profile: Session.MeetingContextProfile) -> String {
+        switch profile {
+        case .general:
+            return "一般的な仕事の会議。論点整理、決定事項、未決事項、次のアクションを重視する。"
+        case .engineering:
+            return "ソフトウェア開発や技術議論。仕様、実装方針、技術的制約、依存関係、リスクを重視する。"
+        case .product:
+            return "商品企画・プロダクト設計・事業検討。ユーザー課題、仮説、優先順位、意思決定理由を重視する。"
+        case .recruitingHR:
+            return "採用・人事・組織運営に関する会話。観察事実、確認事項、次対応、配慮が必要な論点を重視する。"
+        }
+    }
+
+    private func extractionPriorities(for profile: Session.MeetingContextProfile) -> String {
+        switch profile {
+        case .general:
+            return """
+            - 何が決まり、何が未決か
+            - 次に誰が何をするか
+            - リスクや確認待ち事項
+            """
+        case .engineering:
+            return """
+            - 仕様変更、実装方針、設計判断
+            - バグ、技術的制約、依存関係、リスク
+            - 担当、優先度、リリースや対応時期
+            """
+        case .product:
+            return """
+            - 対象ユーザー、課題、価値仮説
+            - 企画案の比較、判断理由、優先順位
+            - 次の検証、意思決定者、保留論点
+            """
+        case .recruitingHR:
+            return """
+            - 観察できた事実と確認事項
+            - 候補者対応、人員計画、組織運営上の次対応
+            - センシティブな内容は断定を避け、要確認を明示
+            """
+        }
     }
 
     // mlx_vlm generate output format:

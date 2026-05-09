@@ -47,6 +47,25 @@ struct SessionServiceTests {
         #expect(try store.listSessions().count == 2)
     }
 
+    @Test
+    func updatesMeetingContextProfile() throws {
+        let session = Session(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000012")!,
+            startedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            status: .draft
+        )
+        let store = SessionServiceInMemoryStore(initialSessions: [session])
+        let service = SessionService(
+            sessionStore: store,
+            clock: SessionServiceFixedClock(now: session.startedAt)
+        )
+
+        let updated = try service.setMeetingContextProfile(.product, for: session)
+
+        #expect(updated.meetingContextProfile == .product)
+        #expect(try store.listSessions().first?.meetingContextProfile == .product)
+    }
+
 }
 
 private final class SessionServiceInMemoryStore: SessionStore, @unchecked Sendable {

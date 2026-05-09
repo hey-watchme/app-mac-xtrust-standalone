@@ -22,6 +22,7 @@ public final class SQLiteSessionStore: SessionStore, TopicStore, UtteranceStore,
             duration_seconds REAL,
             transcript_text TEXT,
             transcript_file_path TEXT,
+            meeting_context_profile TEXT NOT NULL DEFAULT 'general',
             transcription_status TEXT NOT NULL DEFAULT 'idle',
             transcription_error TEXT,
             transcription_duration_seconds REAL,
@@ -33,6 +34,7 @@ public final class SQLiteSessionStore: SessionStore, TopicStore, UtteranceStore,
         try addColumnIfNeeded(table: "sessions", column: "duration_seconds", definition: "REAL", in: db)
         try addColumnIfNeeded(table: "sessions", column: "transcript_text", definition: "TEXT", in: db)
         try addColumnIfNeeded(table: "sessions", column: "transcript_file_path", definition: "TEXT", in: db)
+        try addColumnIfNeeded(table: "sessions", column: "meeting_context_profile", definition: "TEXT NOT NULL DEFAULT 'general'", in: db)
         try addColumnIfNeeded(table: "sessions", column: "transcription_status", definition: "TEXT NOT NULL DEFAULT 'idle'", in: db)
         try addColumnIfNeeded(table: "sessions", column: "transcription_error", definition: "TEXT", in: db)
         try addColumnIfNeeded(table: "sessions", column: "transcription_duration_seconds", definition: "REAL", in: db)
@@ -146,6 +148,7 @@ public final class SQLiteSessionStore: SessionStore, TopicStore, UtteranceStore,
             duration_seconds,
             transcript_text,
             transcript_file_path,
+            meeting_context_profile,
             transcription_status,
             transcription_error,
             transcription_duration_seconds,
@@ -186,13 +189,14 @@ public final class SQLiteSessionStore: SessionStore, TopicStore, UtteranceStore,
             duration_seconds,
             transcript_text,
             transcript_file_path,
+            meeting_context_profile,
             transcription_status,
             transcription_error,
             transcription_duration_seconds,
             utterance_count,
             topic_count
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
 
         var statement: OpaquePointer?
@@ -222,6 +226,7 @@ public final class SQLiteSessionStore: SessionStore, TopicStore, UtteranceStore,
             duration_seconds = ?,
             transcript_text = ?,
             transcript_file_path = ?,
+            meeting_context_profile = ?,
             transcription_status = ?,
             transcription_error = ?,
             transcription_duration_seconds = ?,
@@ -236,7 +241,7 @@ public final class SQLiteSessionStore: SessionStore, TopicStore, UtteranceStore,
         }
         defer { sqlite3_finalize(statement) }
 
-        bind(session: session, to: statement, includeIDAt: 13)
+        bind(session: session, to: statement, includeIDAt: 14)
 
         guard sqlite3_step(statement) == SQLITE_DONE else {
             throw SQLiteSessionStoreError.step(message: errorMessage(from: db))
@@ -818,11 +823,12 @@ public final class SQLiteSessionStore: SessionStore, TopicStore, UtteranceStore,
             bind(double: session.durationSeconds, to: statement, index: 6)
             bind(text: session.transcriptText, to: statement, index: 7)
             bind(text: session.transcriptFilePath, to: statement, index: 8)
-            sqlite3_bind_text(statement, 9, session.transcriptionStatus.rawValue, -1, transientDestructor)
-            bind(text: session.transcriptionError, to: statement, index: 10)
-            bind(double: session.transcriptionDurationSeconds, to: statement, index: 11)
-            sqlite3_bind_int64(statement, 12, sqlite3_int64(session.utteranceCount))
-            sqlite3_bind_int64(statement, 13, sqlite3_int64(session.topicCount))
+            sqlite3_bind_text(statement, 9, session.meetingContextProfile.rawValue, -1, transientDestructor)
+            sqlite3_bind_text(statement, 10, session.transcriptionStatus.rawValue, -1, transientDestructor)
+            bind(text: session.transcriptionError, to: statement, index: 11)
+            bind(double: session.transcriptionDurationSeconds, to: statement, index: 12)
+            sqlite3_bind_int64(statement, 13, sqlite3_int64(session.utteranceCount))
+            sqlite3_bind_int64(statement, 14, sqlite3_int64(session.topicCount))
             return
         }
 
@@ -834,11 +840,12 @@ public final class SQLiteSessionStore: SessionStore, TopicStore, UtteranceStore,
         bind(double: session.durationSeconds, to: statement, index: baseIndex + 4)
         bind(text: session.transcriptText, to: statement, index: baseIndex + 5)
         bind(text: session.transcriptFilePath, to: statement, index: baseIndex + 6)
-        sqlite3_bind_text(statement, baseIndex + 7, session.transcriptionStatus.rawValue, -1, transientDestructor)
-        bind(text: session.transcriptionError, to: statement, index: baseIndex + 8)
-        bind(double: session.transcriptionDurationSeconds, to: statement, index: baseIndex + 9)
-        sqlite3_bind_int64(statement, baseIndex + 10, sqlite3_int64(session.utteranceCount))
-        sqlite3_bind_int64(statement, baseIndex + 11, sqlite3_int64(session.topicCount))
+        sqlite3_bind_text(statement, baseIndex + 7, session.meetingContextProfile.rawValue, -1, transientDestructor)
+        sqlite3_bind_text(statement, baseIndex + 8, session.transcriptionStatus.rawValue, -1, transientDestructor)
+        bind(text: session.transcriptionError, to: statement, index: baseIndex + 9)
+        bind(double: session.transcriptionDurationSeconds, to: statement, index: baseIndex + 10)
+        sqlite3_bind_int64(statement, baseIndex + 11, sqlite3_int64(session.utteranceCount))
+        sqlite3_bind_int64(statement, baseIndex + 12, sqlite3_int64(session.topicCount))
         if let idIndex {
             sqlite3_bind_text(statement, Int32(idIndex), session.id.uuidString, -1, transientDestructor)
         }
@@ -1042,7 +1049,7 @@ public final class SQLiteSessionStore: SessionStore, TopicStore, UtteranceStore,
         guard
             let idCString = sqlite3_column_text(statement, 0),
             let statusCString = sqlite3_column_text(statement, 3),
-            let transcriptionStatusCString = sqlite3_column_text(statement, 8)
+            let transcriptionStatusCString = sqlite3_column_text(statement, 9)
         else {
             return nil
         }
@@ -1055,6 +1062,10 @@ public final class SQLiteSessionStore: SessionStore, TopicStore, UtteranceStore,
             return nil
         }
 
+        let contextProfile = textValue(from: statement, index: 8)
+            .flatMap(Session.MeetingContextProfile.init(rawValue:))
+            ?? .general
+
         return Session(
             id: id,
             startedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 1)),
@@ -1064,11 +1075,12 @@ public final class SQLiteSessionStore: SessionStore, TopicStore, UtteranceStore,
             durationSeconds: doubleValue(from: statement, index: 5),
             transcriptText: textValue(from: statement, index: 6),
             transcriptFilePath: textValue(from: statement, index: 7),
+            meetingContextProfile: contextProfile,
             transcriptionStatus: transcriptionStatus,
-            transcriptionError: textValue(from: statement, index: 9),
-            transcriptionDurationSeconds: doubleValue(from: statement, index: 10),
-            utteranceCount: intValue(from: statement, index: 11) ?? 0,
-            topicCount: intValue(from: statement, index: 12) ?? 0
+            transcriptionError: textValue(from: statement, index: 10),
+            transcriptionDurationSeconds: doubleValue(from: statement, index: 11),
+            utteranceCount: intValue(from: statement, index: 12) ?? 0,
+            topicCount: intValue(from: statement, index: 13) ?? 0
         )
     }
 

@@ -2,6 +2,19 @@
 
 Date: 2026-05-08 JST
 
+## Status snapshot
+
+As of the current PoC state:
+
+- Milestones 0-7 are complete for the first end-to-end local meeting notes
+  vertical slice.
+- Milestone 8 is partially satisfied: the SQLite schema, stable identifiers,
+  and local traversal of sessions / topics / utterances are in place, but the
+  knowledge-oriented projection and migration strategy are not yet formalized.
+- Milestone 9 is partially satisfied: retryable jobs, model-path diagnostics,
+  and restart persistence are implemented, but longer-run capture validation and
+  disk-growth controls remain open.
+
 ## Working rule
 
 Every milestone must end with:
@@ -266,11 +279,12 @@ Deferred:
 - multimodal expansion
 - collaboration
 
-## Open product decisions
+## Historical decisions now reflected in the PoC
 
-These should be answered before Milestone 7:
-
-- whether one operator-opened session is always the boundary for one wrap-up
-- whether topic summaries are generated eagerly or on idle time
-- whether failed utterance ASR blocks topic summarization or not
-- how much raw audio should be retained after transcription
+- One operator-opened session is the boundary for one wrap-up.
+- Topic summaries are operator-triggered from the UI, not eager background
+  jobs.
+- Failed utterance ASR does not automatically block topic summarization; only
+  utterances with available transcripts are summarized.
+- Raw utterance audio is retained locally after transcription as inspectable
+  evidence.

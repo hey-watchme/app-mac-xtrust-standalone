@@ -13,6 +13,29 @@ Design goals:
 - Correct behavior in both light and dark mode without any custom overrides.
 - Smooth micro-interactions: hover states, pulsing indicators, animated meters.
 
+## UI Development Rule
+
+This design system assumes that UI work sits on top of explicit persisted
+contracts rather than one-off button paths.
+
+- do not add product behavior directly behind UI buttons until the underlying
+  state transition can be tested without the UI
+- do not hide failures behind fallback behavior
+- surface real failures at the contract boundary where they occurred
+
+The intended product shape is:
+
+```text
+Session owns Topics
+Topic owns or references Utterances
+Utterance owns RecordingArtifact
+Utterance has TranscriptionJobs
+TranscriptionJob produces TranscriptArtifact
+```
+
+That model keeps the interface inspectable and makes diagnostics visible from
+persisted state instead of transient UI effects.
+
 ---
 
 ## File Map

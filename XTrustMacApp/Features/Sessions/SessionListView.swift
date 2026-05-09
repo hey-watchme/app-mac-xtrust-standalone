@@ -39,6 +39,7 @@ struct SessionListView: View {
                     Task { await appState.summarizeTopic(topicID: id) }
                 },
                 onSetSessionStatus: { appState.setSessionStatus($0) },
+                onSetMeetingContextProfile: { appState.setMeetingContextProfile($0) },
                 onSummarizeMeeting: {
                     Task { await appState.summarizeMeeting() }
                 },

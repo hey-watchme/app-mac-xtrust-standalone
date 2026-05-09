@@ -1,6 +1,13 @@
 import Foundation
 
 public struct Session: Identifiable, Equatable, Sendable {
+    public enum MeetingContextProfile: String, Codable, Equatable, CaseIterable, Sendable {
+        case general
+        case engineering
+        case product
+        case recruitingHR = "recruiting_hr"
+    }
+
     public enum Status: String, Codable, Equatable, Sendable {
         case draft
         case recording
@@ -24,6 +31,7 @@ public struct Session: Identifiable, Equatable, Sendable {
     public let durationSeconds: Double?
     public let transcriptText: String?
     public let transcriptFilePath: String?
+    public let meetingContextProfile: MeetingContextProfile
     public let transcriptionStatus: TranscriptionStatus
     public let transcriptionError: String?
     public let transcriptionDurationSeconds: Double?
@@ -39,6 +47,7 @@ public struct Session: Identifiable, Equatable, Sendable {
         durationSeconds: Double? = nil,
         transcriptText: String? = nil,
         transcriptFilePath: String? = nil,
+        meetingContextProfile: MeetingContextProfile = .general,
         transcriptionStatus: TranscriptionStatus = .idle,
         transcriptionError: String? = nil,
         transcriptionDurationSeconds: Double? = nil,
@@ -53,6 +62,7 @@ public struct Session: Identifiable, Equatable, Sendable {
         self.durationSeconds = durationSeconds
         self.transcriptText = transcriptText
         self.transcriptFilePath = transcriptFilePath
+        self.meetingContextProfile = meetingContextProfile
         self.transcriptionStatus = transcriptionStatus
         self.transcriptionError = transcriptionError
         self.transcriptionDurationSeconds = transcriptionDurationSeconds
@@ -70,6 +80,7 @@ public struct Session: Identifiable, Equatable, Sendable {
             durationSeconds: nil,
             transcriptText: nil,
             transcriptFilePath: nil,
+            meetingContextProfile: meetingContextProfile,
             transcriptionStatus: .idle,
             transcriptionError: nil,
             transcriptionDurationSeconds: nil,
@@ -92,6 +103,7 @@ public struct Session: Identifiable, Equatable, Sendable {
             durationSeconds: durationSeconds,
             transcriptText: transcriptText,
             transcriptFilePath: transcriptFilePath,
+            meetingContextProfile: meetingContextProfile,
             transcriptionStatus: transcriptionStatus,
             transcriptionError: transcriptionError,
             transcriptionDurationSeconds: transcriptionDurationSeconds,
@@ -110,6 +122,7 @@ public struct Session: Identifiable, Equatable, Sendable {
             durationSeconds: durationSeconds,
             transcriptText: transcriptText,
             transcriptFilePath: transcriptFilePath,
+            meetingContextProfile: meetingContextProfile,
             transcriptionStatus: transcriptionStatus,
             transcriptionError: transcriptionError,
             transcriptionDurationSeconds: transcriptionDurationSeconds,
@@ -128,6 +141,26 @@ public struct Session: Identifiable, Equatable, Sendable {
             durationSeconds: durationSeconds,
             transcriptText: transcriptText,
             transcriptFilePath: transcriptFilePath,
+            meetingContextProfile: meetingContextProfile,
+            transcriptionStatus: transcriptionStatus,
+            transcriptionError: transcriptionError,
+            transcriptionDurationSeconds: transcriptionDurationSeconds,
+            utteranceCount: utteranceCount,
+            topicCount: topicCount
+        )
+    }
+
+    public func withMeetingContextProfile(_ profile: MeetingContextProfile) -> Session {
+        Session(
+            id: id,
+            startedAt: startedAt,
+            endedAt: endedAt,
+            status: status,
+            audioFilePath: audioFilePath,
+            durationSeconds: durationSeconds,
+            transcriptText: transcriptText,
+            transcriptFilePath: transcriptFilePath,
+            meetingContextProfile: profile,
             transcriptionStatus: transcriptionStatus,
             transcriptionError: transcriptionError,
             transcriptionDurationSeconds: transcriptionDurationSeconds,

@@ -19,7 +19,10 @@ public struct TopicSummaryRunner: Sendable {
     }
 
     @discardableResult
-    public func run(topic: Topic) async throws -> Topic {
+    public func run(
+        topic: Topic,
+        contextProfile: Session.MeetingContextProfile = .general
+    ) async throws -> Topic {
         let utterances = try utteranceStore.listUtterances(topicID: topic.id)
 
         var transcripts: [String] = []
@@ -38,7 +41,12 @@ public struct TopicSummaryRunner: Sendable {
         try topicStore.updateTopic(runningTopic)
 
         do {
-            let summaryText = try await summarizer.summarize(transcripts: transcripts)
+            let request = SummarizationRequest(
+                scope: .topic,
+                contextProfile: contextProfile,
+                transcripts: transcripts
+            )
+            let summaryText = try await summarizer.summarize(request: request)
             let completedTopic = runningTopic.withSummaryCompleted(text: summaryText)
             try topicStore.updateTopic(completedTopic)
             return completedTopic

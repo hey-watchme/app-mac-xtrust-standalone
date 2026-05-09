@@ -24,6 +24,7 @@ struct SQLiteSessionStoreTests {
         #expect(sessions.count == 1)
         #expect(sessions.first?.id == session.id)
         #expect(sessions.first?.status == .draft)
+        #expect(sessions.first?.meetingContextProfile == .general)
     }
 
     @Test
@@ -104,6 +105,30 @@ struct SQLiteSessionStoreTests {
         #expect(sessions.first?.transcriptFilePath == "/tmp/test.txt")
         #expect(sessions.first?.transcriptionStatus == .completed)
         #expect(sessions.first?.transcriptionDurationSeconds == 2.3)
+    }
+
+    @Test
+    func persistsMeetingContextProfile() throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        let paths = WorkspacePaths(root: tempRoot)
+        let store = SQLiteSessionStore(databaseURL: paths.database)
+        try store.initialize()
+
+        let sessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000004")!
+        try store.insertSession(
+            Session(
+                id: sessionID,
+                startedAt: Date(timeIntervalSince1970: 1_700_000_000),
+                status: .draft,
+                meetingContextProfile: .engineering
+            )
+        )
+
+        let sessions = try store.listSessions()
+
+        #expect(sessions.first?.meetingContextProfile == .engineering)
     }
 
     @Test

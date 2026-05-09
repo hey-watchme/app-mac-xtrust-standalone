@@ -3,14 +3,20 @@ import Testing
 @testable import AppCore
 
 struct TopicSummaryRunnerTests {
-    private let sessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000200")!
-    private let topicID = UUID(uuidString: "00000000-0000-0000-0000-000000000201")!
+    private var sessionID: UUID {
+        UUID(uuidString: "00000000-0000-0000-0000-000000000200")!
+    }
+
+    private var topicID: UUID {
+        UUID(uuidString: "00000000-0000-0000-0000-000000000201")!
+    }
 
     @Test
     func runsSuccessfulSummary() async throws {
         let topicStore = InMemoryTopicStore()
         let utteranceStore = InMemoryUtteranceStore()
         let artifactStore = InMemoryTranscriptArtifactStore()
+        let recorder = SummarizationRequestRecorder()
 
         let topic = makeTopic()
         try topicStore.insertTopic(topic)
@@ -19,12 +25,23 @@ struct TopicSummaryRunnerTests {
         try utteranceStore.insertUtterance(utterance)
         try artifactStore.insertTranscriptArtifact(makeTranscriptArtifact(utteranceID: utterance.id, text: "会議の内容です"))
 
-        let runner = makeRunner(topicStore: topicStore, utteranceStore: utteranceStore, artifactStore: artifactStore, result: .success("会議の要約テキスト"))
-        let result = try await runner.run(topic: topic)
+        let runner = makeRunner(
+            topicStore: topicStore,
+            utteranceStore: utteranceStore,
+            artifactStore: artifactStore,
+            result: .success("会議の要約テキスト"),
+            recorder: recorder
+        )
+        let result = try await runner.run(topic: topic, contextProfile: .engineering)
 
         #expect(result.summaryStatus == .completed)
         #expect(result.summaryText == "会議の要約テキスト")
         #expect(result.summaryError == nil)
+
+        let request = recorder.lastRequest
+        #expect(request?.scope == .topic)
+        #expect(request?.contextProfile == .engineering)
+        #expect(request?.transcripts == ["会議の内容です"])
 
         let stored = try topicStore.listTopics(sessionID: sessionID).first!
         #expect(stored.summaryStatus == .completed)
@@ -43,7 +60,13 @@ struct TopicSummaryRunnerTests {
         let utterance = makeUtterance()
         try utteranceStore.insertUtterance(utterance)
 
-        let runner = makeRunner(topicStore: topicStore, utteranceStore: utteranceStore, artifactStore: artifactStore, result: .success("should not run"))
+        let runner = makeRunner(
+            topicStore: topicStore,
+            utteranceStore: utteranceStore,
+            artifactStore: artifactStore,
+            result: .success("should not run"),
+            recorder: nil
+        )
 
         do {
             _ = try await runner.run(topic: topic)
@@ -69,7 +92,13 @@ struct TopicSummaryRunnerTests {
         try utteranceStore.insertUtterance(utterance)
         try artifactStore.insertTranscriptArtifact(makeTranscriptArtifact(utteranceID: utterance.id, text: "test"))
 
-        let runner = makeRunner(topicStore: topicStore, utteranceStore: utteranceStore, artifactStore: artifactStore, result: .failure(FakeSummarizerError.modelFailed))
+        let runner = makeRunner(
+            topicStore: topicStore,
+            utteranceStore: utteranceStore,
+            artifactStore: artifactStore,
+            result: .failure(FakeSummarizerError.modelFailed),
+            recorder: nil
+        )
 
         do {
             _ = try await runner.run(topic: topic)
@@ -115,13 +144,14 @@ struct TopicSummaryRunnerTests {
         topicStore: InMemoryTopicStore,
         utteranceStore: InMemoryUtteranceStore,
         artifactStore: InMemoryTranscriptArtifactStore,
-        result: Result<String, Error>
+        result: Result<String, Error>,
+        recorder: SummarizationRequestRecorder?
     ) -> TopicSummaryRunner {
         TopicSummaryRunner(
             topicStore: topicStore,
             utteranceStore: utteranceStore,
             transcriptArtifactStore: artifactStore,
-            summarizer: FakeSummarizer(result: result)
+            summarizer: FakeSummarizer(result: result, recorder: recorder)
         )
     }
 }
@@ -177,12 +207,18 @@ private final class InMemoryTranscriptArtifactStore: TranscriptArtifactStore, @u
     }
 }
 
+private final class SummarizationRequestRecorder: @unchecked Sendable {
+    var lastRequest: SummarizationRequest?
+}
+
 private struct FakeSummarizer: Summarizer, @unchecked Sendable {
     var modelIdentifier: String { "fake-summarizer" }
     let result: Result<String, Error>
+    let recorder: SummarizationRequestRecorder?
 
-    func summarize(transcripts: [String]) async throws -> String {
-        try result.get()
+    func summarize(request: SummarizationRequest) async throws -> String {
+        recorder?.lastRequest = request
+        return try result.get()
     }
 }
 
