@@ -100,6 +100,24 @@ public struct Session: Identifiable, Equatable, Sendable {
         )
     }
 
+    public func withStatus(_ newStatus: Status) -> Session {
+        Session(
+            id: id,
+            startedAt: startedAt,
+            endedAt: endedAt,
+            status: newStatus,
+            audioFilePath: audioFilePath,
+            durationSeconds: durationSeconds,
+            transcriptText: transcriptText,
+            transcriptFilePath: transcriptFilePath,
+            transcriptionStatus: transcriptionStatus,
+            transcriptionError: transcriptionError,
+            transcriptionDurationSeconds: transcriptionDurationSeconds,
+            utteranceCount: utteranceCount,
+            topicCount: topicCount
+        )
+    }
+
     public func closed(endedAt: Date) -> Session {
         Session(
             id: id,

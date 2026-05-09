@@ -9,7 +9,7 @@ struct AppRuntime {
     let microphoneRecorder: MicrophoneRecorder
     let audioPlaybackController: AudioPlaybackController
     let whisperTranscriber: WhisperCLITranscriber
-    let gemmaSummarizer: LiteRTLMSummarizer
+    let gemmaSummarizer: MLXSummarizer
     let transcriptionJobRunner: TranscriptionJobRunner
     let topicSummaryRunner: TopicSummaryRunner
     let captureRuntime: CaptureRuntime
@@ -27,10 +27,10 @@ struct AppRuntime {
         let whisperTranscriber = WhisperCLITranscriber(
             configuration: .developmentDefault(modelsRootDirectory: modelsRoot)
         )
-        let gemmaConfiguration = LiteRTLMSummarizerConfiguration.developmentDefault(
+        let gemmaConfiguration = MLXSummarizerConfiguration.developmentDefault(
             modelsRootDirectory: modelsRoot
         )
-        let gemmaSummarizer = LiteRTLMSummarizer(configuration: gemmaConfiguration)
+        let gemmaSummarizer = MLXSummarizer(configuration: gemmaConfiguration)
         let sessionStore = SQLiteSessionStore(databaseURL: paths.database)
         let sessionService = SessionService(
             sessionStore: sessionStore,
@@ -80,7 +80,7 @@ struct AppRuntime {
                 paths: paths,
                 recordingActive: microphoneRecorder.isRecording,
                 whisperConfiguration: whisperTranscriber.configuration,
-                gemmaConfiguration: gemmaConfiguration
+                mlxConfiguration: gemmaConfiguration
             )
         )
     }

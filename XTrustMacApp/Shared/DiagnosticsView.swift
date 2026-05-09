@@ -27,8 +27,8 @@ struct DiagnosticsView: View {
                 isMonospaced: true
             )
             CopyableDetailRow(
-                title: "Gemma 4 Model",
-                value: diagnostics.gemmaModelPath,
+                title: "Gemma 4 MLX Model",
+                value: diagnostics.mlxModelDirectory,
                 isMonospaced: true
             )
             CopyableDetailRow(title: "Session Count", value: String(sessionCount))
@@ -38,7 +38,7 @@ struct DiagnosticsView: View {
             statusRow("Summary Directory", isReady: diagnostics.summariesReady)
             statusRow("Models Directory", isReady: diagnostics.modelsReady)
             statusRow("Whisper Model Ready", isReady: diagnostics.whisperModelReady)
-            statusRow("Gemma 4 Model Ready", isReady: diagnostics.gemmaModelReady)
+            statusRow("Gemma 4 MLX Ready", isReady: diagnostics.gemmaModelReady)
             statusRow("Database File", isReady: diagnostics.databaseReady)
             statusRow("Recording Active", isReady: diagnostics.recordingActive)
 

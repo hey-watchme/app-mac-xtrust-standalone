@@ -13,27 +13,22 @@ struct SessionListView: View {
                     set: { appState.selectSession($0) }
                 )
             ) { session in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(session.startedAt, format: .dateTime.year().month().day().hour().minute())
-                        .font(.headline)
-                    Text(session.status.rawValue)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 4)
+                Text(sessionTitle(from: session.startedAt))
+                    .font(.headline)
+                    .padding(.vertical, 4)
             }
             .overlay {
                 if appState.sessions.isEmpty {
                     ContentUnavailableView(
-                        "No Sessions Yet",
+                        "セッションがありません",
                         systemImage: "waveform.badge.plus",
-                        description: Text("Select \"New Session\" above to start.")
+                        description: Text("「新規セッション」を押して開始してください。")
                     )
                 }
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("New Session") {
+                    Button("新規セッション") {
                         appState.createSession()
                     }
                 }
@@ -46,6 +41,9 @@ struct SessionListView: View {
                         isListening: appState.isListening,
                         isSpeechActive: appState.isSpeechActive,
                         audioLevel: appState.audioLevel,
+                        diagnostics: appState.diagnostics,
+                        sessionCount: appState.sessions.count,
+                        errorMessage: appState.errorMessage,
                         onStartListening: {
                             Task { await appState.startListening() }
                         },
@@ -56,22 +54,19 @@ struct SessionListView: View {
                         onSummarizeTopic: { topicID in
                             Task { await appState.summarizeTopic(topicID: topicID) }
                         },
-                        onCloseSession: { appState.closeSession() },
+                        onSetSessionStatus: { appState.setSessionStatus($0) },
+                        onSummarizeMeeting: {
+                            Task { await appState.summarizeMeeting() }
+                        },
                         onCopyWrapUp: {
                             if let detail = appState.selectedSessionDetail {
                                 let text = appState.wrapUpText(for: detail)
                                 NSPasteboard.general.clearContents()
                                 NSPasteboard.general.setString(text, forType: .string)
                             }
-                        }
-                    )
-
-                    Divider()
-
-                    DiagnosticsView(
-                        diagnostics: appState.diagnostics,
-                        sessionCount: appState.sessions.count,
-                        errorMessage: appState.errorMessage
+                        },
+                        meetingSummaryText: appState.meetingSummaryText,
+                        isSummarizingMeeting: appState.isSummarizingMeeting
                     )
 
                     Spacer(minLength: 0)
@@ -81,4 +76,14 @@ struct SessionListView: View {
             }
         }
     }
+
+    private func sessionTitle(from date: Date) -> String {
+        let cal = Calendar.current
+        let year = cal.component(.year, from: date)
+        let month = cal.component(.month, from: date)
+        let day = cal.component(.day, from: date)
+        let hour = cal.component(.hour, from: date)
+        return "\(year)年\(month)月\(day)日\(hour)時の会議"
+    }
+
 }

@@ -59,4 +59,10 @@ public struct SessionService: Sendable {
         return updatedSession
     }
 
+    public func setStatus(_ status: Session.Status, for session: Session) throws -> Session {
+        let updated = session.withStatus(status)
+        try sessionStore.updateSession(updated)
+        return updated
+    }
+
 }

@@ -1,80 +1,61 @@
 # Next Session Handoff
 
-Date: 2026-05-08 JST
+Date: 2026-05-08 JST (final)
 
-## Current decision
+## Current state
 
-Phase 7 is complete end-to-end. The Gemma 4 E4B adapter is wired in and
-the model is running locally via LiteRT-LM.
+All cleanup complete. Xcode BUILD SUCCEEDED. 25 tests pass.
+E2E test confirmed: Summarize button works, latency ~12 seconds.
 
 ## What was completed this session
 
-### LiteRT-LM Gemma 4 E4B adapter (complete)
+### MLX migration
+- `MLXSummarizer.swift` created (mlx_vlm 0.5.0 + Gemma 4 E4B)
+- `LiteRTLMSummarizer.swift` deleted
+- Old model `models/gemma4/` deleted (3.4 GB freed)
+- `AppRuntime`, `AppState`, `AppDiagnostics`, `DiagnosticsView` updated
 
-- `LiteRTLMSummarizer` implemented in `XTrustMacApp/Shared/LiteRTLMSummarizer.swift`
-- `Summarizer` port wired — `StubSummarizer` removed from `AppRuntime`
-- Subprocess pattern mirrors `WhisperCLITranscriber`: Process + Pipe + waitUntilExit
-- Prompt: Japanese meeting summary with テーマ / 要点 / アクション structure
-- `--backend gpu` default for M1 Metal acceleration
-- Dynamic pyenv path discovery: scans `~/.pyenv/versions/*/bin/litert-lm`
+### Dead code removal from AppState
+Removed the old one-shot `MicrophoneRecorder` recording path that predates CaptureRuntime:
+- `activeRecordingSessionID` (@Published)
+- `startRecording()` / `stopRecording()` / `isRecording`
+- `draftSessionForRecording()`
+- `transcribeSelectedSession()` / `ensureTranscriptionContext()` / `existingOrNewUtterance()`
+- `SessionTranscriptionContext` / `SessionTranscriptionContextError`
+- `refreshDiagnostics()` now uses `captureRuntime.isCapturing` (was `microphoneRecorder.isRecording`)
 
-### litert-lm installation and model download (complete)
+### E2E test result
+- Summarize button: works correctly, Japanese summary output confirmed
+- Latency: ~12 seconds (acceptable)
+- VAD threshold 0.01: tuned and working
 
-- `litert-lm 0.11.0` installed via `pip install litert-lm` (Python 3.11.8 / pyenv)
-- Binary: `~/.pyenv/versions/3.11.8/bin/litert-lm`
-- Model: `gemma-4-E4B-it.litertlm` (3.4 GB)
-  - Path: `~/Library/Application Support/XTrust/com.xtrust.mac-local-first/models/gemma4/gemma-4-E4B-it.litertlm`
-  - Source: `litert-community/gemma-4-E4B-it-litert-lm` (HuggingFace)
+## Python environment
 
-### Diagnostics updated
+- Python 3.11.8 (pyenv)
+- `mlx-lm 0.31.3`, `mlx-vlm 0.5.0`
+- Model: `models/gemma4-mlx/` — `Gemma4ForConditionalGeneration`, 4bit, ~4.86 GB
 
-- `AppDiagnostics` now shows Gemma 4 model path and ready status
-- `DiagnosticsView` shows "Gemma 4 Model" path row and "Gemma 4 Model Ready" status
+## App flow
 
-### Build / test status
+1. Left column → "New Session"
+2. "Start" → VAD capture (RMS 0.01, 3s silence)
+3. Speak → Utterance persisted → topic assigned
+4. "Transcribe" → Whisper → transcript
+5. "Summarize" (per topic) → `mlx_vlm generate` → Japanese summary (~12s)
+6. "Close Session" → "Copy Wrap-Up"
 
-- `swift build` — BUILD SUCCEEDED
-- `swift test` — 25 tests pass
-- `litert-lm` CLI smoke test — correct Japanese output confirmed
+## Next actions
 
-## Current state of the app
+### Near-term
+- [ ] Multimodal expansion: whiteboard capture via vision (`--image` arg, mlx_vlm対応済み)
+- [ ] Meeting ASR via audio (Gemma 4 has `audio_config`, mlx-audio installed)
 
-Working flow:
-1. Left column → "New Session" → session created and selected
-2. "Start" → VAD capture begins
-3. Speak → silence 3s → Utterance + RecordingArtifact persisted → topic assigned
-4. "Transcribe" button per utterance → Whisper runs → transcript appears
-5. Per-topic "Summarize" button → `LiteRTLMSummarizer` calls `litert-lm` → Japanese summary appears
-6. "Close Session" button → marks session as closed, stops listening
-7. "Copy Wrap-Up" button → Markdown text copied to clipboard
-
-Status:
-- `swift test` — 25 tests pass
-- `swift build` — BUILD SUCCEEDED
-- Gemma 4 E4B smoke test from CLI — passed
-
-## What has not changed
-
-- VAD threshold 0.01 not tuned (possible false triggers on ambient noise)
-- Dead `MicrophoneRecorder` one-shot path still in `AppState` (low priority)
-
-## Open questions for next session
-
-1. **Summarize latency**: Gemma 4 E4B with `--backend gpu` on M1 Pro — measure
-   real-world summary time for a typical topic (10–20 utterances).
-
-2. **Thinking tokens**: by default litert-lm may emit `<|channel>thought\n...<channel|>` tokens.
-   Verify the raw output in practice. If thinking tokens appear in the summary text,
-   add a post-processing step in `LiteRTLMSummarizer.summarize()` to strip them.
-
-3. **VAD tuning**: threshold 0.01 may need adjustment based on real meeting conditions.
-
-4. **Dead code**: `MicrophoneRecorder` one-shot path in `AppState` — remove or keep?
+### Low priority
+- [ ] `MicrophoneRecorder` itself — currently used only for `requestPermission()` in `startListening()`.
+  Could be inlined into `AVAudioCaptureController` if desired.
 
 ## Key documents
 
 - `docs/product-requirements.md`
 - `docs/milestones.md`
-- `docs/design-reset.md`
-- `docs/implementation-plan.md`
 - `docs/architecture.md`

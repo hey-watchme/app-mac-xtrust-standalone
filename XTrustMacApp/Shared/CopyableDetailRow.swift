@@ -5,6 +5,7 @@ struct CopyableDetailRow: View {
     let title: String
     let value: String
     var isMonospaced: Bool = false
+    var showCopyButton: Bool = true
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -17,11 +18,13 @@ struct CopyableDetailRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .textSelection(.enabled)
 
-            Button("Copy") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(value, forType: .string)
+            if showCopyButton {
+                Button("Copy") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(value, forType: .string)
+                }
+                .buttonStyle(.borderless)
             }
-            .buttonStyle(.borderless)
         }
     }
 }
