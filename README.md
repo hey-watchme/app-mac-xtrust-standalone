@@ -22,6 +22,7 @@ Technical stack and implementation planning are tracked in:
 - `docs/tech-stack-plan.md`
 - `docs/milestones.md`
 - `docs/testing-strategy.md`
+- `docs/design-system.md`
 
 ## Why this project exists
 
@@ -193,6 +194,8 @@ Implemented so far:
 - per-topic `Summarize` button, summary status badge, and summary text display
 - `Close Session` button and `Copy Wrap-Up` (Markdown to clipboard)
 - Diagnostics screen shows Whisper and Gemma 4 model paths and ready status
+- UI design system (`XT` token namespace, custom components, Ambient Memo concept)
+  — see `docs/design-system.md`
 
 Current verification:
 

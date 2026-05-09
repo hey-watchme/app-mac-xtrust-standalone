@@ -14,7 +14,7 @@ struct XTrustMacApp: App {
                     AppLaunchErrorView(errorMessage: launchState.errorMessage)
                 }
             }
-            .frame(minWidth: 960, minHeight: 600)
+            .frame(minWidth: 1060, minHeight: 660)
         }
     }
 }

@@ -1,6 +1,8 @@
 import AppCore
 import SwiftUI
 
+// MARK: - Session Detail View
+
 struct SessionDetailView: View {
     let detail: SessionDetailSnapshot?
     let isListening: Bool
@@ -20,496 +22,666 @@ struct SessionDetailView: View {
     let isSummarizingMeeting: Bool
 
     @State private var showDiagnostics = false
-    @State private var showLatestJobInfo = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            if let detail {
-                let session = detail.session
+        if let detail {
+            contentView(detail: detail)
+                .navigationTitle(sessionTitle(from: detail.session.startedAt))
+        } else {
+            emptyState
+                .navigationTitle("")
+        }
+    }
 
-                HStack(alignment: .firstTextBaseline) {
-                    Text(sessionTitle(from: session.startedAt))
-                        .font(.title)
-                        .fontWeight(.semibold)
+    // MARK: - Main Content
+
+    private func contentView(detail: SessionDetailSnapshot) -> some View {
+        VStack(spacing: 0) {
+            sessionHeader(session: detail.session)
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: XT.S.xxl) {
+
+                    if isListening {
+                        recordingBar
+                    } else {
+                        controlBar(session: detail.session)
+                    }
+
+                    if let msg = errorMessage {
+                        errorBanner(msg)
+                    }
+
+                    if isSummarizingMeeting || meetingSummaryText != nil {
+                        meetingSummaryCard
+                    }
+
+                    topicsSection(detail: detail)
+                }
+                .padding(XT.Layout.contentPadding)
+                .frame(maxWidth: XT.Layout.contentMaxWidth)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    // MARK: - Session Header
+
+    private func sessionHeader(session: Session) -> some View {
+        HStack(spacing: XT.S.md) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(sessionTitle(from: session.startedAt))
+                    .font(XT.F.displayTitle)
+                    .foregroundStyle(XT.C.textPrimary)
+
+                HStack(spacing: XT.S.sm) {
+                    XTSessionStatusBadge(status: session.status)
+
+                    if session.topicCount > 0 {
+                        Text("\(session.topicCount) トピック")
+                            .font(XT.F.caption)
+                            .foregroundStyle(XT.C.textSecondary)
+                    }
+
+                    if let dur = session.durationSeconds {
+                        Text("·")
+                            .foregroundStyle(XT.C.textTertiary)
+                        Text(formatDuration(dur))
+                            .font(XT.F.caption)
+                            .foregroundStyle(XT.C.textTertiary)
+                    }
+                }
+            }
+
+            Spacer()
+
+            Button(action: onCopyWrapUp) {
+                Label("まとめをコピー", systemImage: "doc.on.doc")
+            }
+            .buttonStyle(XTSecondaryButtonStyle())
+            .help("会議のまとめをクリップボードにコピー")
+
+            Button {
+                showDiagnostics.toggle()
+            } label: {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 15))
+                    .foregroundStyle(XT.C.textSecondary)
+            }
+            .buttonStyle(XTIconButtonStyle())
+            .popover(isPresented: $showDiagnostics, arrowEdge: .bottom) {
+                diagnosticsPopover(session: session)
+            }
+        }
+        .padding(.horizontal, XT.Layout.contentPadding)
+        .frame(height: 64)
+    }
+
+    // MARK: - Recording Bar
+
+    private var recordingBar: some View {
+        HStack(spacing: XT.S.lg) {
+            RecordingDot()
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(isSpeechActive ? "発話を検出" : "待機中")
+                    .font(XT.F.body)
+                    .fontWeight(.medium)
+                    .foregroundStyle(isSpeechActive ? XT.C.recording : XT.C.textPrimary)
+                    .animation(.easeInOut(duration: 0.1), value: isSpeechActive)
+
+                Text("VAD · RMS 0.01 · 無音 3 秒でセグメント化")
+                    .font(XT.F.caption)
+                    .foregroundStyle(XT.C.textTertiary)
+            }
+
+            Spacer()
+
+            AudioLevelMeter(level: audioLevel)
+                .frame(width: 88)
+
+            Button(action: onStopListening) {
+                Label("停止", systemImage: "stop.fill")
+            }
+            .buttonStyle(XTDestructiveButtonStyle())
+        }
+        .padding(XT.S.lg)
+        .background(XT.C.recordingBG)
+        .clipShape(RoundedRectangle(cornerRadius: XT.R.lg))
+        .overlay(
+            RoundedRectangle(cornerRadius: XT.R.lg)
+                .strokeBorder(XT.C.recordingBorder, lineWidth: 1)
+        )
+    }
+
+    // MARK: - Control Bar
+
+    private func controlBar(session: Session) -> some View {
+        HStack(spacing: XT.S.sm) {
+            Button(action: onStartListening) {
+                Label("録音開始", systemImage: "mic.fill")
+            }
+            .buttonStyle(XTPrimaryButtonStyle())
+            .disabled(session.status == .closed)
+
+            Button(action: onSummarizeMeeting) {
+                Label("会議を要約", systemImage: "sparkles")
+            }
+            .buttonStyle(XTSecondaryButtonStyle())
+            .disabled(isSummarizingMeeting)
+
+            Spacer()
+
+            Picker("", selection: Binding(
+                get: { session.status },
+                set: { onSetSessionStatus($0) }
+            )) {
+                Text("下書き").tag(Session.Status.draft)
+                Text("録音中").tag(Session.Status.recording)
+                Text("完了").tag(Session.Status.completed)
+                Text("失敗").tag(Session.Status.failed)
+                Text("クローズ済み").tag(Session.Status.closed)
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .controlSize(.small)
+        }
+    }
+
+    // MARK: - Meeting Summary Card
+
+    private var meetingSummaryCard: some View {
+        XTCard {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    XTSectionLabel(text: "会議の要約")
                     Spacer()
-                    Picker("", selection: Binding(
-                        get: { session.status },
-                        set: { onSetSessionStatus($0) }
-                    )) {
-                        Text("下書き").tag(Session.Status.draft)
-                        Text("録音中").tag(Session.Status.recording)
-                        Text("完了").tag(Session.Status.completed)
-                        Text("失敗").tag(Session.Status.failed)
-                        Text("クローズ済み").tag(Session.Status.closed)
-                    }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    Button {
-                        showDiagnostics.toggle()
-                    } label: {
-                        Image(systemName: "info.circle")
-                            .font(.title2)
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .popover(isPresented: $showDiagnostics, arrowEdge: .top) {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 20) {
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Text("セッション基本情報")
-                                        .font(.title3)
-                                        .fontWeight(.semibold)
-                                    CopyableDetailRow(title: "セッションID", value: session.id.uuidString, isMonospaced: true)
-                                    CopyableDetailRow(
-                                        title: "作成日時",
-                                        value: session.startedAt.formatted(
-                                            .dateTime.year().month().day().hour().minute().second()
-                                            .locale(Locale(identifier: "ja_JP"))
-                                        )
-                                    )
-                                }
-                                Divider()
-                                DiagnosticsView(
-                                    diagnostics: diagnostics,
-                                    sessionCount: sessionCount,
-                                    errorMessage: errorMessage
-                                )
-                            }
-                            .padding(20)
+                    if isSummarizingMeeting {
+                        HStack(spacing: XT.S.xs) {
+                            ProgressView().controlSize(.mini)
+                            Text("生成中…")
+                                .font(XT.F.caption)
+                                .foregroundStyle(XT.C.textSecondary)
                         }
-                        .frame(minWidth: 420, maxHeight: 600)
                     }
-                    Button {
-                        onCopyWrapUp()
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                            .font(.title2)
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("まとめをクリップボードにコピー")
                 }
+                .padding(.horizontal, XT.S.lg)
+                .padding(.top, XT.S.lg)
+                .padding(.bottom, XT.S.md)
 
-                if let errorMessage {
-                    Text(errorMessage)
-                        .foregroundStyle(.red)
-                        .font(.callout)
+                Divider()
+                    .padding(.horizontal, XT.S.md)
+
+                if let text = meetingSummaryText {
+                    Text(text)
+                        .font(XT.F.body)
+                        .foregroundStyle(XT.C.textPrimary)
                         .textSelection(.enabled)
+                        .lineSpacing(4)
+                        .padding(XT.S.lg)
+                } else {
+                    Text("Gemma 4 が会議の要約を生成しています…")
+                        .font(XT.F.body)
+                        .foregroundStyle(XT.C.textTertiary)
+                        .padding(XT.S.lg)
                 }
-                if let endedAt = session.endedAt {
-                    CopyableDetailRow(
-                        title: "終了",
-                        value: endedAt.formatted(.dateTime.year().month().day().hour().minute().second()),
-                        showCopyButton: false
+            }
+        }
+    }
+
+    // MARK: - Topics Section
+
+    @ViewBuilder
+    private func topicsSection(detail: SessionDetailSnapshot) -> some View {
+        if detail.utterances.isEmpty && !isListening {
+            emptySessionHint
+        } else {
+            VStack(alignment: .leading, spacing: XT.S.xxl) {
+                let unassigned = detail.utterances.filter { $0.utterance.topicID == nil }
+                if !unassigned.isEmpty {
+                    TopicCardView(
+                        topic: nil,
+                        index: nil,
+                        utterances: unassigned,
+                        onSummarizeTopic: onSummarizeTopic,
+                        onTranscribeUtterance: onTranscribeUtterance
                     )
                 }
-                if let durationSeconds = session.durationSeconds {
-                    CopyableDetailRow(title: "録音時間", value: String(format: "%.1f 秒", durationSeconds), showCopyButton: false)
-                }
 
-                HStack(spacing: 12) {
-                    if isListening {
-                        Button("停止") { onStopListening() }
-                            .buttonStyle(.bordered)
-                        captureStatusView
-                        ProgressView(value: Double(min(audioLevel * 10, 1.0)))
-                            .progressViewStyle(.linear)
-                            .frame(width: 80)
-                            .tint(.green)
-                    } else {
-                        Button("開始") { onStartListening() }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(session.status == .closed)
-                        Button("会議の要約") { onSummarizeMeeting() }
-                            .buttonStyle(.bordered)
-                            .disabled(isSummarizingMeeting)
+                ForEach(Array(detail.topics.enumerated()), id: \.element.id) { index, topic in
+                    let topicUtterances = detail.utterances.filter {
+                        $0.utterance.topicID == topic.id
+                    }
+                    if !topicUtterances.isEmpty
+                        || topic.summaryText != nil
+                        || topic.summaryStatus != .idle
+                    {
+                        TopicCardView(
+                            topic: topic,
+                            index: index + 1,
+                            utterances: topicUtterances,
+                            onSummarizeTopic: onSummarizeTopic,
+                            onTranscribeUtterance: onTranscribeUtterance
+                        )
                     }
                 }
+            }
+        }
+    }
 
-                if isSummarizingMeeting {
-                    HStack(spacing: 6) {
-                        ProgressView().controlSize(.small)
-                        Text("会議を要約中…").foregroundStyle(.secondary)
+    // MARK: - Empty States
+
+    private var emptyState: some View {
+        VStack(spacing: XT.S.lg) {
+            Image(systemName: "waveform.badge.microphone")
+                .font(.system(size: 52))
+                .foregroundStyle(XT.C.textTertiary)
+                .symbolRenderingMode(.hierarchical)
+
+            Text("セッションを選択")
+                .font(XT.F.displayTitle)
+                .foregroundStyle(XT.C.textPrimary)
+
+            Text("左のリストからセッションを選択するか、\n新規セッションを作成してください。")
+                .font(XT.F.body)
+                .foregroundStyle(XT.C.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var emptySessionHint: some View {
+        VStack(spacing: XT.S.sm) {
+            Image(systemName: "mic.badge.plus")
+                .font(.system(size: 36))
+                .foregroundStyle(XT.C.textTertiary)
+                .symbolRenderingMode(.hierarchical)
+
+            Text("「録音開始」を押して会議を記録してください")
+                .font(XT.F.body)
+                .foregroundStyle(XT.C.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, XT.S.xxxl)
+    }
+
+    // MARK: - Error Banner
+
+    private func errorBanner(_ message: String) -> some View {
+        HStack(spacing: XT.S.sm) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(XT.C.warning)
+            Text(message)
+                .font(XT.F.caption)
+                .foregroundStyle(XT.C.textPrimary)
+                .textSelection(.enabled)
+            Spacer()
+        }
+        .padding(XT.S.md)
+        .background(XT.C.warningBG)
+        .clipShape(RoundedRectangle(cornerRadius: XT.R.sm))
+        .overlay(
+            RoundedRectangle(cornerRadius: XT.R.sm)
+                .strokeBorder(XT.C.warning.opacity(0.25), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Diagnostics Popover
+
+    private func diagnosticsPopover(session: Session) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: XT.S.xl) {
+                VStack(alignment: .leading, spacing: XT.S.md) {
+                    Text("セッション情報")
+                        .font(.system(size: 14, weight: .semibold))
+
+                    CopyableDetailRow(title: "ID", value: session.id.uuidString, isMonospaced: true)
+                    CopyableDetailRow(
+                        title: "開始",
+                        value: session.startedAt.formatted(
+                            .dateTime.year().month().day().hour().minute().second()
+                                .locale(Locale(identifier: "ja_JP"))
+                        )
+                    )
+                    if let endedAt = session.endedAt {
+                        CopyableDetailRow(
+                            title: "終了",
+                            value: endedAt.formatted(.dateTime.year().month().day().hour().minute().second())
+                        )
                     }
-                } else if let text = meetingSummaryText {
-                    Text(text)
-                        .textSelection(.enabled)
-                        .padding(.top, 2)
                 }
 
                 Divider()
 
-                utterancesSection(detail: detail)
-
-            } else {
-                ContentUnavailableView(
-                    "セッション未選択",
-                    systemImage: "sidebar.left",
-                    description: Text("左側のリストからセッションを選択するか、新規セッションを作成してください。")
+                DiagnosticsView(
+                    diagnostics: diagnostics,
+                    sessionCount: sessionCount,
+                    errorMessage: errorMessage
                 )
             }
+            .padding(XT.S.xl)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(minWidth: 400, maxHeight: 580)
     }
 
-    @ViewBuilder
-    private func latestJobSection(detail: SessionDetailSnapshot) -> some View {
-        Text("最新の文字起こしジョブ")
-            .font(.headline)
-
-        if let latestJob = detail.utterances
-            .compactMap(\.latestTranscriptionJob)
-            .max(by: { lhs, rhs in lhs.createdAt < rhs.createdAt }) {
-            CopyableDetailRow(title: "ジョブID", value: latestJob.id.uuidString, isMonospaced: true)
-            CopyableDetailRow(title: "ステータス", value: latestJob.status.rawValue)
-            CopyableDetailRow(title: "モデル", value: latestJob.modelIdentifier)
-            CopyableDetailRow(title: "言語", value: latestJob.language)
-            CopyableDetailRow(title: "作成", value: format(date: latestJob.createdAt))
-            if let startedAt = latestJob.startedAt {
-                CopyableDetailRow(title: "開始", value: format(date: startedAt))
-            }
-            if let endedAt = latestJob.endedAt {
-                CopyableDetailRow(title: "終了", value: format(date: endedAt))
-            }
-            CopyableDetailRow(title: "作業ディレクトリ", value: latestJob.workingDirectoryPath, isMonospaced: true)
-            CopyableDetailRow(title: "コマンド", value: latestJob.command, isMonospaced: true)
-            if !latestJob.arguments.isEmpty {
-                CopyableDetailRow(title: "引数", value: latestJob.arguments.joined(separator: " "), isMonospaced: true)
-            }
-            if let stdoutFilePath = latestJob.stdoutFilePath {
-                CopyableDetailRow(title: "標準出力", value: stdoutFilePath, isMonospaced: true)
-            }
-            if let stderrFilePath = latestJob.stderrFilePath {
-                CopyableDetailRow(title: "標準エラー", value: stderrFilePath, isMonospaced: true)
-            }
-            if let exitCode = latestJob.exitCode {
-                CopyableDetailRow(title: "終了コード", value: String(exitCode))
-            }
-            if !latestJob.outputFileNames.isEmpty {
-                CopyableDetailRow(title: "出力ファイル", value: latestJob.outputFileNames.joined(separator: ", "), isMonospaced: true)
-            }
-            if let failureMessage = latestJob.failureMessage {
-                CopyableDetailRow(title: "エラー詳細", value: failureMessage)
-            }
-        } else {
-            Text("文字起こしジョブはまだありません。")
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    @ViewBuilder
-    private func utterancesSection(detail: SessionDetailSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("発言一覧")
-                    .font(.headline)
-                Button {
-                    showLatestJobInfo.toggle()
-                } label: {
-                    Image(systemName: "info.circle")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("最新の文字起こしジョブ")
-                .popover(isPresented: $showLatestJobInfo, arrowEdge: .top) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("最新の文字起こしジョブ")
-                                .font(.headline)
-                                .padding(.bottom, 4)
-                            latestJobSection(detail: detail)
-                        }
-                        .padding(16)
-                    }
-                    .frame(minWidth: 380, maxHeight: 500)
-                }
-            }
-
-            if detail.utterances.isEmpty {
-                Text("このセッションにはまだ発言がありません。")
-                    .foregroundStyle(.secondary)
-            } else {
-                let unassigned = detail.utterances.filter { $0.utterance.topicID == nil }
-                if !unassigned.isEmpty {
-                    utteranceList(unassigned)
-                }
-
-                ForEach(Array(detail.topics.enumerated()), id: \.element.id) { index, topic in
-                    let topicUtterances = detail.utterances.filter { $0.utterance.topicID == topic.id }
-                    if !topicUtterances.isEmpty {
-                        if index > 0 {
-                            Divider()
-                        }
-                        topicHeaderView(topic: topic, index: index + 1)
-                        utteranceList(topicUtterances)
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func topicHeaderView(topic: Topic, index: Int) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text("トピック \(index)")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                Text("— \(format(date: topic.startedAt))")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                if topic.status == .active {
-                    Text("録音中")
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.green.opacity(0.15))
-                        .foregroundStyle(.green)
-                        .clipShape(Capsule())
-                }
-                Spacer()
-                summaryBadge(for: topic)
-                Button("要約") { onSummarizeTopic(topic.id) }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(topic.summaryStatus == .running)
-            }
-            if let summaryText = topic.summaryText {
-                Text(summaryText)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 4)
-            }
-            if let summaryError = topic.summaryError, topic.summaryStatus == .failed {
-                Text("要約失敗: \(summaryError)")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-        }
-        .padding(.top, 4)
-    }
-
-    @ViewBuilder
-    private func summaryBadge(for topic: Topic) -> some View {
-        switch topic.summaryStatus {
-        case .idle:
-            EmptyView()
-        case .running:
-            Text("要約中…")
-                .font(.caption2)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.blue.opacity(0.15))
-                .foregroundStyle(.blue)
-                .clipShape(Capsule())
-        case .completed:
-            Text("要約完了")
-                .font(.caption2)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.green.opacity(0.15))
-                .foregroundStyle(.green)
-                .clipShape(Capsule())
-        case .failed:
-            Text("要約失敗")
-                .font(.caption2)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.red.opacity(0.15))
-                .foregroundStyle(.red)
-                .clipShape(Capsule())
-        }
-    }
-
-    @ViewBuilder
-    private func utteranceList(_ utterances: [UtteranceDetailSnapshot]) -> some View {
-        ForEach(utterances) { utteranceDetail in
-            UtteranceCardView(
-                utteranceDetail: utteranceDetail,
-                onTranscribeUtterance: onTranscribeUtterance
-            )
-        }
-    }
-
-    @ViewBuilder
-    private var captureStatusView: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(isSpeechActive ? Color.red : Color.secondary.opacity(0.4))
-                    .frame(width: 8, height: 8)
-                Text(isSpeechActive ? "録音中" : "待機中")
-                    .foregroundStyle(isSpeechActive ? .red : .secondary)
-            }
-            .font(.caption)
-            .animation(.easeInOut(duration: 0.1), value: isSpeechActive)
-
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(audioLevel > 0.01 ? Color.orange : Color.clear)
-                    .overlay(Circle().strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1))
-                    .frame(width: 6, height: 6)
-                Text("発話を検出")
-                    .foregroundStyle(.secondary)
-            }
-            .font(.caption)
-        }
-    }
+    // MARK: - Helpers
 
     private func sessionTitle(from date: Date) -> String {
-        let cal = Calendar.current
-        let year = cal.component(.year, from: date)
-        let month = cal.component(.month, from: date)
-        let day = cal.component(.day, from: date)
-        let hour = cal.component(.hour, from: date)
-        return "\(year)年\(month)月\(day)日\(hour)時の会議"
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ja_JP")
+        f.dateFormat = "M月d日（E） H:mm の会議"
+        return f.string(from: date)
     }
 
-    private func format(date: Date) -> String {
-        date.formatted(.dateTime.year().month().day().hour().minute().second())
+    private func formatDuration(_ seconds: Double) -> String {
+        let m = Int(seconds) / 60
+        let s = Int(seconds) % 60
+        return m > 0 ? "\(m)分 \(s)秒" : "\(s)秒"
     }
 }
 
-private struct UtteranceCardView: View {
+// MARK: - Topic Card
+
+private struct TopicCardView: View {
+    let topic: Topic?
+    let index: Int?
+    let utterances: [UtteranceDetailSnapshot]
+    let onSummarizeTopic: (UUID) -> Void
+    let onTranscribeUtterance: (UUID) -> Void
+
+    var body: some View {
+        XTCard {
+            VStack(alignment: .leading, spacing: 0) {
+                topicHeader
+
+                if let topic,
+                   topic.summaryText != nil
+                       || topic.summaryStatus == .running
+                       || topic.summaryStatus == .failed
+                {
+                    topicSummaryArea(topic: topic)
+                }
+
+                if !utterances.isEmpty {
+                    Divider()
+                        .padding(.horizontal, XT.S.md)
+
+                    utteranceList
+                }
+            }
+        }
+    }
+
+    // MARK: Header
+
+    private var topicHeader: some View {
+        HStack(spacing: XT.S.sm) {
+            // Topic label
+            if let index {
+                Text("Topic \(index)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(XT.C.textTertiary)
+                    .padding(.horizontal, XT.S.sm)
+                    .padding(.vertical, XT.S.xxs + 1)
+                    .background(XT.C.textTertiary.opacity(0.09))
+                    .clipShape(Capsule())
+            } else {
+                Text("未分類")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(XT.C.textTertiary)
+            }
+
+            if let topic {
+                Text(formatTime(topic.startedAt))
+                    .font(XT.F.mono)
+                    .foregroundStyle(XT.C.textTertiary)
+
+                if topic.status == .active {
+                    RecordingDot()
+                }
+            }
+
+            Spacer()
+
+            if let topic {
+                XTTopicSummaryBadge(status: topic.summaryStatus)
+
+                Button("要約") { onSummarizeTopic(topic.id) }
+                    .buttonStyle(XTSecondaryButtonStyle())
+                    .controlSize(.small)
+                    .disabled(topic.summaryStatus == .running)
+            }
+        }
+        .padding(.horizontal, XT.S.lg)
+        .frame(height: 46)
+    }
+
+    // MARK: Summary Area
+
+    private func topicSummaryArea(topic: Topic) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider()
+                .padding(.horizontal, XT.S.md)
+
+            Group {
+                if topic.summaryStatus == .running {
+                    HStack(spacing: XT.S.sm) {
+                        ProgressView().controlSize(.mini)
+                        Text("Gemma 4 が要約を生成中…")
+                            .font(XT.F.caption)
+                            .foregroundStyle(XT.C.textSecondary)
+                    }
+                } else if let summaryText = topic.summaryText {
+                    Text(summaryText)
+                        .font(XT.F.body)
+                        .foregroundStyle(XT.C.textPrimary)
+                        .textSelection(.enabled)
+                        .lineSpacing(4)
+                } else if let error = topic.summaryError, topic.summaryStatus == .failed {
+                    HStack(spacing: XT.S.xs) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundStyle(XT.C.destructive)
+                        Text("要約失敗: \(error)")
+                            .font(XT.F.caption)
+                            .foregroundStyle(XT.C.destructive)
+                    }
+                }
+            }
+            .padding(XT.S.lg)
+        }
+    }
+
+    // MARK: Utterance List
+
+    private var utteranceList: some View {
+        VStack(spacing: 0) {
+            ForEach(utterances) { ud in
+                UtteranceRowView(
+                    utteranceDetail: ud,
+                    onTranscribeUtterance: onTranscribeUtterance
+                )
+
+                if ud.id != utterances.last?.id {
+                    Divider()
+                        .padding(.leading, XT.S.lg + 72)
+                }
+            }
+        }
+    }
+
+    private func formatTime(_ date: Date) -> String {
+        date.formatted(.dateTime.hour().minute().second())
+    }
+}
+
+// MARK: - Utterance Row
+
+private struct UtteranceRowView: View {
     let utteranceDetail: UtteranceDetailSnapshot
     let onTranscribeUtterance: (UUID) -> Void
 
     @State private var showDetail = false
+    @State private var isHovered = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            transcriptContent
+        HStack(alignment: .firstTextBaseline, spacing: XT.S.lg) {
+            // Timestamp
+            Text(formatTime(utteranceDetail.utterance.startedAt))
+                .font(XT.F.mono)
+                .foregroundStyle(XT.C.textTertiary)
+                .frame(width: 72, alignment: .trailing)
+                .layoutPriority(1)
 
-            HStack(spacing: 4) {
-                Text(format(date: utteranceDetail.utterance.startedAt))
-                Text("—")
-                if let endedAt = utteranceDetail.utterance.endedAt {
-                    Text(format(date: endedAt))
+            // Transcript
+            VStack(alignment: .leading, spacing: XT.S.xxs + 1) {
+                transcriptContent
+
+                if let dur = utteranceDetail.utterance.durationSeconds {
+                    Text(String(format: "%.1f 秒", dur))
+                        .font(XT.F.caption)
+                        .foregroundStyle(XT.C.textTertiary)
                 }
-                Spacer()
+            }
+
+            Spacer(minLength: XT.S.sm)
+
+            // Action menu (appears on hover)
+            if isHovered || showDetail {
                 Button {
                     showDetail.toggle()
                 } label: {
-                    Image(systemName: "info.circle")
-                        .foregroundStyle(.secondary)
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(XT.C.textSecondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(XTIconButtonStyle())
                 .popover(isPresented: $showDetail, arrowEdge: .bottom) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
-                            detailContent
-                        }
-                        .padding(16)
-                    }
-                    .frame(minWidth: 380, maxHeight: 480)
+                    utteranceDetailPopover
                 }
+                .transition(.opacity.animation(.easeInOut(duration: 0.1)))
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, XT.S.lg)
+        .padding(.vertical, XT.S.sm + 2)
+        .background(isHovered ? XT.C.hoveredBG : Color.clear)
+        .contentShape(Rectangle())
+        .onHover { hovered in
+            withAnimation(.easeInOut(duration: 0.08)) { isHovered = hovered }
+        }
     }
+
+    // MARK: Transcript Content
 
     @ViewBuilder
     private var transcriptContent: some View {
         if let text = utteranceDetail.latestTranscriptArtifact?.text {
             Text(text)
+                .font(XT.F.body)
+                .foregroundStyle(XT.C.textPrimary)
                 .textSelection(.enabled)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
         } else if utteranceDetail.latestTranscriptionJob?.status == .running {
-            HStack(spacing: 6) {
-                ProgressView()
-                    .controlSize(.small)
+            HStack(spacing: XT.S.xs) {
+                ProgressView().controlSize(.mini)
                 Text("文字起こし中…")
-                    .foregroundStyle(.secondary)
+                    .font(XT.F.body)
+                    .foregroundStyle(XT.C.textSecondary)
             }
         } else if utteranceDetail.latestTranscriptionJob?.status == .failed {
             Text("文字起こし失敗")
-                .foregroundStyle(.red)
+                .font(XT.F.body)
+                .foregroundStyle(XT.C.destructive)
         } else {
-            Text("（未文字起こし）")
-                .foregroundStyle(.tertiary)
+            Text("未文字起こし")
+                .font(XT.F.body)
+                .foregroundStyle(XT.C.textTertiary)
                 .italic()
         }
     }
 
-    @ViewBuilder
-    private var detailContent: some View {
-        if utteranceDetail.latestRecordingArtifact != nil {
-            let isRunning = utteranceDetail.latestTranscriptionJob?.status == .running
-            Button("文字起こし再実行") {
-                onTranscribeUtterance(utteranceDetail.utterance.id)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .disabled(isRunning)
-            Divider()
-        }
-        if let durationSeconds = utteranceDetail.utterance.durationSeconds {
-            CopyableDetailRow(title: "長さ", value: String(format: "%.1f 秒", durationSeconds), showCopyButton: false)
-        }
-        CopyableDetailRow(title: "文字起こし状態", value: utteranceDetail.utterance.transcriptionStatus.rawValue, showCopyButton: false)
-        if let artifact = utteranceDetail.latestRecordingArtifact {
-            CopyableDetailRow(title: "音声サイズ", value: ByteCountFormatter.string(fromByteCount: artifact.byteSize, countStyle: .file), showCopyButton: false)
-        }
+    // MARK: Detail Popover
 
-        if let latestJob = utteranceDetail.latestTranscriptionJob {
-            Divider()
-            Text("最新ジョブ")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-            CopyableDetailRow(title: "ジョブID", value: latestJob.id.uuidString, isMonospaced: true)
-            CopyableDetailRow(title: "ジョブ状態", value: latestJob.status.rawValue, showCopyButton: false)
-            if let stdoutFilePath = latestJob.stdoutFilePath {
-                CopyableDetailRow(title: "標準出力", value: stdoutFilePath, isMonospaced: true)
-            }
-            if let stderrFilePath = latestJob.stderrFilePath {
-                CopyableDetailRow(title: "標準エラー", value: stderrFilePath, isMonospaced: true)
-            }
-            if let failureMessage = latestJob.failureMessage {
-                CopyableDetailRow(title: "エラー詳細", value: failureMessage, showCopyButton: false)
-            }
-        }
+    private var utteranceDetailPopover: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: XT.S.md) {
+                if utteranceDetail.latestRecordingArtifact != nil {
+                    Button("文字起こし再実行") {
+                        onTranscribeUtterance(utteranceDetail.utterance.id)
+                    }
+                    .buttonStyle(XTSecondaryButtonStyle())
+                    .disabled(utteranceDetail.latestTranscriptionJob?.status == .running)
 
-        if !utteranceDetail.transcriptionJobs.isEmpty {
-            Divider()
-            Text("試行履歴")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-            ForEach(Array(utteranceDetail.transcriptionJobs.enumerated()).reversed(), id: \.element.id) { offset, job in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("試行 \(offset + 1)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    CopyableDetailRow(title: "ジョブID", value: job.id.uuidString, isMonospaced: true)
-                    CopyableDetailRow(title: "ステータス", value: job.status.rawValue, showCopyButton: false)
-                    CopyableDetailRow(title: "作成", value: format(date: job.createdAt), showCopyButton: false)
-                    if let stdoutFilePath = job.stdoutFilePath {
-                        CopyableDetailRow(title: "標準出力", value: stdoutFilePath, isMonospaced: true)
-                    }
-                    if let stderrFilePath = job.stderrFilePath {
-                        CopyableDetailRow(title: "標準エラー", value: stderrFilePath, isMonospaced: true)
-                    }
-                    if let exitCode = job.exitCode {
-                        CopyableDetailRow(title: "終了コード", value: String(exitCode), showCopyButton: false)
-                    }
-                    if let failureMessage = job.failureMessage {
-                        CopyableDetailRow(title: "エラー詳細", value: failureMessage, showCopyButton: false)
-                    }
-                }
-                if job.id != utteranceDetail.transcriptionJobs.first?.id {
                     Divider()
                 }
-            }
-        }
 
-        if let transcriptArtifact = utteranceDetail.latestTranscriptArtifact {
-            Divider()
-            CopyableDetailRow(title: "文字起こしファイル", value: transcriptArtifact.filePath, isMonospaced: true)
+                if let dur = utteranceDetail.utterance.durationSeconds {
+                    CopyableDetailRow(title: "長さ", value: String(format: "%.1f 秒", dur), showCopyButton: false)
+                }
+                CopyableDetailRow(
+                    title: "文字起こし状態",
+                    value: utteranceDetail.utterance.transcriptionStatus.rawValue,
+                    showCopyButton: false
+                )
+                if let artifact = utteranceDetail.latestRecordingArtifact {
+                    CopyableDetailRow(
+                        title: "音声サイズ",
+                        value: ByteCountFormatter.string(fromByteCount: artifact.byteSize, countStyle: .file),
+                        showCopyButton: false
+                    )
+                }
+
+                if let job = utteranceDetail.latestTranscriptionJob {
+                    Divider()
+                    Text("最新ジョブ")
+                        .font(.system(size: 12, weight: .semibold))
+                    CopyableDetailRow(title: "ジョブID", value: job.id.uuidString, isMonospaced: true)
+                    CopyableDetailRow(title: "状態", value: job.status.rawValue, showCopyButton: false)
+                    if let stdout = job.stdoutFilePath {
+                        CopyableDetailRow(title: "stdout", value: stdout, isMonospaced: true)
+                    }
+                    if let stderr = job.stderrFilePath {
+                        CopyableDetailRow(title: "stderr", value: stderr, isMonospaced: true)
+                    }
+                    if let msg = job.failureMessage {
+                        CopyableDetailRow(title: "エラー詳細", value: msg, showCopyButton: false)
+                    }
+                }
+
+                if utteranceDetail.transcriptionJobs.count > 1 {
+                    Divider()
+                    Text("試行履歴 (\(utteranceDetail.transcriptionJobs.count) 回)")
+                        .font(.system(size: 12, weight: .semibold))
+                    ForEach(
+                        Array(utteranceDetail.transcriptionJobs.enumerated()).reversed(),
+                        id: \.element.id
+                    ) { offset, job in
+                        HStack(spacing: XT.S.sm) {
+                            Text("試行 \(offset + 1)")
+                                .font(XT.F.caption)
+                                .foregroundStyle(XT.C.textTertiary)
+                            Text(job.status.rawValue)
+                                .font(XT.F.caption)
+                                .foregroundStyle(XT.C.textSecondary)
+                            Spacer()
+                            Text(job.createdAt.formatted(.dateTime.hour().minute().second()))
+                                .font(XT.F.mono)
+                                .foregroundStyle(XT.C.textTertiary)
+                        }
+                    }
+                }
+
+                if let artifact = utteranceDetail.latestTranscriptArtifact {
+                    Divider()
+                    CopyableDetailRow(title: "文字起こしファイル", value: artifact.filePath, isMonospaced: true)
+                }
+            }
+            .padding(XT.S.lg)
         }
+        .frame(minWidth: 360, maxHeight: 480)
     }
 
-    private func format(date: Date) -> String {
+    private func formatTime(_ date: Date) -> String {
         date.formatted(.dateTime.hour().minute().second())
     }
 }
