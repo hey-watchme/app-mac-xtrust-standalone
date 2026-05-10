@@ -1,15 +1,14 @@
-# Mac Local-First Meeting Notes PoC
+# Mac Local-First Ambient Memo
 
-Date: 2026-05-08 JST
+Date: 2026-05-10 JST
 
-This directory is reserved for a new standalone macOS PoC that runs on a
-MacBook M1 Pro class machine and is independent from WatchMe / ZeroTouch cloud
-infrastructure.
+This directory contains a standalone macOS local-first ambient memo product
+line that is independent from WatchMe / ZeroTouch cloud infrastructure.
 
 ## Current status
 
-This project has completed the first end-to-end local meeting notes vertical
-slice through Milestone 7:
+This project has completed the first end-to-end local meeting notes PoC
+vertical slice through the original Milestone 7:
 
 - a real macOS Xcode project at `XTrustMacApp.xcodeproj`
 - a native `SwiftUI` app target at `XTrustMacApp/`
@@ -20,10 +19,43 @@ slice through Milestone 7:
 - baseline unit and integration tests for workspace bootstrap, persistence, and
   job flows
 
+The next phase is a structural redesign.
+
+The product is now being reframed as a shared room device:
+
+- organization-owned
+- workspace-scoped
+- device-centered
+- short-lived operator access
+- privacy-safe between meetings
+
+This means the current `Session`-centric model is no longer sufficient by
+itself. The upcoming redesign introduces:
+
+- `Organization`
+- `Workspace`
+- `Device`
+- `Account`
+- `OrganizationMembership`
+- `AccessSession`
+- `CaptureSession`
+
+Implemented in the redesign so far:
+
+- SQLite root tables for `Organization`, `Workspace`, `Device`, `Account`,
+  `OrganizationMembership`, and `AccessSession`
+- default local shared-device bootstrap for development
+- diagnostics exposure for current organization / workspace / device scope
+- persistent `AccessSession` service with local mock login and logout
+- locked room-device start screen when no active access session exists
+- `Settings` view in the left sidebar for shared-device metadata inspection
+
 Technical stack and implementation planning are tracked in:
 
+- `docs/product-requirements.md`
 - `docs/architecture.md`
 - `docs/tech-stack-plan.md`
+- `docs/implementation-plan.md`
 - `docs/milestones.md`
 - `docs/testing-strategy.md`
 - `docs/design-system.md`
@@ -32,40 +64,45 @@ Technical stack and implementation planning are tracked in:
 ## Why this project exists
 
 This project establishes a laptop-first local-first product line, starting with
-this MacBook M1 Pro.
+this MacBook M1 Pro and evolving toward an organization-managed shared-device
+deployment model.
 
 ## Goal
 
-Build a simple and robust local-first meeting notes app for macOS that can:
+Build a simple and robust local-first ambient memo device for macOS that can:
 
 ```text
-Capture meeting audio
+Room device access
+  -> capture meeting audio
   -> transcribe locally
   -> summarize locally
-  -> save locally
-  -> export locally
+  -> show / print / export on-site
+  -> reset safely for the next meeting
 ```
 
-The first version should prioritize operational reliability over feature count.
+The first versions should prioritize privacy boundaries and operational
+reliability over feature count.
 
 ## Product boundary
 
 The macOS app should prove a stricter local-first posture than the cloud app.
 
-Initial target:
+Current redesign target:
 
-- no required cloud API dependency
-- no required account or login
-- no required backend service
-- local storage for audio, transcript, and summaries
+- no required cloud API dependency for core capture
+- no required backend service for local processing
+- local storage for audio, transcript, summaries, and policy metadata
 - local ASR
 - local LLM summarization
 - explicit local model paths under app-managed directories
+- short-lived access on a shared room device
+- strong privacy between consecutive meetings
 
 Allowed later, but not required for v1:
 
+- badge / SSO integration
 - optional export
-- optional manual model import
+- optional manual model import or device bootstrap tooling
 - optional system-audio / screen capture
 
 ## Decision
@@ -94,9 +131,17 @@ Why:
 - local ASR / LLM orchestration is simpler and more robust in a desktop app
 - the first version only needs one machine target: Apple Silicon macOS
 
-## First PoC scope
+## Restart guide
 
-Build only one vertical path first:
+If you are resuming work from zero, read in this order:
+
+1. `docs/product-requirements.md`
+2. `docs/architecture.md`
+3. `docs/implementation-plan.md`
+4. `docs/milestones.md`
+5. this `README.md`
+
+The first PoC scope that is already complete was:
 
 ```text
 Microphone input
@@ -107,7 +152,13 @@ Microphone input
   -> local session save
 ```
 
-Do not start with:
+The redesign now intentionally revisits earlier assumptions. In particular:
+
+- the old `Session` concept is being split
+- the app is no longer treated as a personal single-operator tool
+- shared-device privacy and retention are now core product behavior
+
+The original PoC did not yet include:
 
 - accounts or workspace management
 - cloud sync
@@ -122,15 +173,17 @@ Do not start with:
 
 - primary machine: MacBook Pro with M1 Pro
 - primary platform: macOS desktop
-- first UI target: single local operator, single machine
-- first runtime mode: offline-capable and local-first
+- current deployment target: one shared room device per room or field site
+- current runtime mode: offline-capable and local-first
 
 ## Success criteria
 
 - Japanese meeting audio can be transcribed at practical speed on the target Mac
 - local wrap-up quality is strong enough for meeting-note review
 - the app remains stable during normal meeting-length operation
-- audio, transcript, and summary artifacts remain inspectable on local storage
+- on-device results are available during the active meeting flow
+- prior meeting content is not casually visible to the next room user
+- retention and purge behavior become explicit and testable
 
 ## Relationship to other tracks
 
@@ -151,13 +204,15 @@ mac-local-first/
 ├── scripts/
 ├── README.md
 └── docs/
+    ├── product-requirements.md
     ├── architecture.md
+    ├── implementation-plan.md
     ├── tech-stack-plan.md
     ├── milestones.md
     └── testing-strategy.md
 ```
 
-## Current status
+## Current implementation status
 
 Implemented so far:
 
@@ -203,15 +258,42 @@ Implemented so far:
   primary recording flow
 - UI design system (`XT` token namespace, custom components, Ambient Memo concept)
   — see `docs/design-system.md`
+- root entity persistence for `Organization`, `Workspace`, `Device`, `Account`,
+  and `OrganizationMembership`
+- default local shared-device bootstrap via `SharedDeviceBootstrapService`
+- `AccessSession` domain, SQLite persistence, and `AccessSessionService`
+- locked shared-device screen before local access begins
+- logout path that resets the shared UI and clears visible session history from
+  the current operator flow
+- `Settings` screen available from the left sidebar footer
+- diagnostics now show current organization / workspace / device and access
+  status
+- Whisper invocation hardened against common no-speech / trailing-silence
+  hallucination at utterance boundaries
+- trailing silence is no longer written into finalized utterance wav files
+- empty or no-output transcription results are treated as discarded noise, not
+  as operator-facing failures
+- topic and meeting summarization now run through one serialized queue instead
+  of launching concurrent MLX jobs
+- MLX summarization now rejects oversized prompts and low-memory starts before
+  launching the subprocess
+- stale `summary_status = running` rows are recovered automatically on app
+  startup
+- `Settings` now includes a self-service `Reset Stuck Summaries` maintenance
+  action
 
-Current verification:
+Current verification of the completed PoC slice:
 
 - `swift build`
-- `swift test` — 25 tests pass
+- `swift test` — 41 tests pass
 - `xcodebuild -project XTrustMacApp.xcodeproj -scheme XTrustMacApp build`
-- manual flow: create session -> start VAD capture -> speak -> silence 3s ->
-  utterance created -> transcribe locally (Whisper) -> summarize topic
-  locally (Gemma 4 E4B via MLX) -> close session -> copy wrap-up
+- manual flow: locked screen -> begin local access -> inspect `Settings` ->
+  create session -> start VAD capture -> speak -> silence 3s -> utterance
+  created -> transcribe locally (Whisper) -> summarize topic locally (Gemma 4
+  E4B via MLX) -> close session -> copy wrap-up -> logout -> return to locked
+  screen
+- recovery flow: force-stop during summary -> relaunch -> confirm stale running
+  summaries are auto-recovered or can be reset from `Settings`
 
 Open in Xcode:
 

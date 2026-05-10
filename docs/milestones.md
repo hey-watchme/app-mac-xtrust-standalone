@@ -1,19 +1,49 @@
 # Ambient Memo Milestones
 
-Date: 2026-05-08 JST
+Date: 2026-05-10 JST
 
 ## Status snapshot
 
-As of the current PoC state:
+This project has two phases now.
 
-- Milestones 0-7 are complete for the first end-to-end local meeting notes
-  vertical slice.
-- Milestone 8 is partially satisfied: the SQLite schema, stable identifiers,
-  and local traversal of sessions / topics / utterances are in place, but the
-  knowledge-oriented projection and migration strategy are not yet formalized.
-- Milestone 9 is partially satisfied: retryable jobs, model-path diagnostics,
-  and restart persistence are implemented, but longer-run capture validation and
-  disk-growth controls remain open.
+### Phase A: Completed PoC
+
+The first local-first PoC is complete through the original vertical slice:
+
+- local mic capture
+- VAD-based utterance segmentation
+- local ASR
+- topic grouping
+- local topic summarization
+- session wrap-up
+
+That work proved the local pipeline on one Mac.
+
+### Phase B: Current redesign target
+
+The next phase is not incremental polish.
+
+It is a structural redesign from:
+
+- single-operator local session app
+
+to:
+
+- organization-owned shared room device
+- short-lived operator access
+- strict between-meeting privacy
+- policy-driven logout, reset, and purge
+
+Current progress inside Phase B:
+
+- Milestone 8 is complete
+- Milestone 9 is complete for development bootstrap and diagnostics visibility
+- Milestone 10 is partially complete: active access, logout, locked screen, and
+  settings visibility are implemented; idle-timeout and real auth adapters are
+  still open
+- summary execution is now hardened enough that concurrent button presses do not
+  spawn parallel MLX jobs, and stale `running` summary states are recoverable
+  without DB edits
 
 ## Working rule
 
@@ -21,270 +51,280 @@ Every milestone must end with:
 
 - one operator-visible outcome
 - one reproducible manual check
-- one explicit definition of what is deferred
+- one explicit statement of what remains deferred
 
-Do not move to the next milestone while the current milestone still depends on
-manual file surgery or unclear operator behavior.
+Do not move to the next milestone while the current one still depends on manual
+DB edits, unclear privacy behavior, or undocumented policy assumptions.
 
-## Milestone 0: Product and data contract
+## Completed foundation milestones
+
+### Milestone 0: First product and data contract
+
+Completed.
+
+Outcome:
+
+- the original `session -> topic -> utterance` vertical slice was defined
+
+### Milestone 1: Runtime skeleton
+
+Completed.
+
+Outcome:
+
+- app shell, diagnostics, local workspace bootstrap, and local persistence are
+  working
+
+### Milestone 2: Session-controlled microphone monitoring
+
+Completed.
+
+Outcome:
+
+- one active capture flow can monitor microphone input
+
+### Milestone 3: VAD-based utterance capture
+
+Completed.
+
+Outcome:
+
+- detected speech spans are persisted as utterances
+
+### Milestone 4: Local utterance ASR
+
+Completed.
+
+Outcome:
+
+- saved utterances can be transcribed locally with retryable jobs
+
+### Milestone 5: Topic formation
+
+Completed.
+
+Outcome:
+
+- utterances are grouped into topics by silence-gap rule
+
+### Milestone 6: Local topic summarization
+
+Completed.
+
+Outcome:
+
+- topics can be summarized locally
+
+### Milestone 7: Session wrap-up
+
+Completed.
+
+Outcome:
+
+- one closed session can produce a local wrap-up
+
+## Redesign milestones
+
+### Milestone 8: Shared-device product reset
+
+Status:
+
+Completed.
 
 Goal:
 
-- freeze the product definition before more implementation
+- freeze the room-device product definition before more code changes
 
 Scope:
 
-- confirm the standalone product purpose
-- confirm `session -> topic -> utterance` hierarchy
-- define silence thresholds
-- define local-only requirement
-- define first non-goals
+- define `Organization`, `Workspace`, `Device`, `Account`,
+  `OrganizationMembership`
+- split `Session` into `AccessSession` and `CaptureSession`
+- define privacy, logout, and purge requirements
+- document ownership boundaries
 
 Exit criteria:
 
-- one written requirements document exists
-- one written milestone sequence exists
-- one written implementation plan exists
-- one written decision list exists for unresolved product choices
+- requirements and architecture documents describe the room-device model
+- README explains the redesign context to a new reader
+- milestone sequence for the redesign is written
 
 Deferred:
 
+- schema changes
 - code changes
 
-## Milestone 1: Runtime skeleton
+### Milestone 9: Root entity bootstrap
+
+Status:
+
+Completed for the current development path.
 
 Goal:
 
-- establish a production-shaped runtime skeleton without pretending the product
-  is already working
+- introduce the organization/workspace/device/account foundation in persistence
+  and runtime bootstrap
 
 Scope:
 
-- app shell
-- runtime bootstrap
-- local workspace bootstrap
-- local persistence bootstrap
-- diagnostics screen
-- stable launch / relaunch behavior
+- SQLite schema for root entities
+- device bootstrap identity
+- minimal local seed flow for first organization/workspace/device/account
+- diagnostics exposure for device scope
 
 Exit criteria:
 
-- app launches reliably
-- app relaunches without state loss
-- diagnostics can show paths, model readiness, and storage readiness
+- app can boot with one known organization, workspace, and device identity
+- app can show which device it is operating as
+- a settings surface can show current organization / workspace / device
+  metadata
 
 Deferred:
 
-- session-controlled listening
-- real VAD
-- real topic formation
+- real auth
+- capture gating
 
-## Milestone 2: Session-controlled microphone monitoring
+### Milestone 10: Access session boundary
+
+Status:
+
+Partially completed.
 
 Goal:
 
-- prove that one operator-opened session can remain active and monitor
-  microphone input without manual start/stop recording per utterance
+- add temporary shared-device access control without changing the local capture
+  pipeline yet
 
 Scope:
 
-- active session lifecycle
-- microphone permission flow
-- input pipeline setup
-- audio level monitoring
-- lifecycle handling for long-running capture
-- diagnostics for capture state
+- `AccessSession` model and store
+- active access state in app runtime
+- logout and idle-timeout handling
+- neutral locked screen when no access session is active
+- settings visibility for the current access and device scope
+- self-service maintenance for stale summary recovery on a shared device
 
 Exit criteria:
 
-- operator can open one session and start listening
-- app can remain active and monitor input for an extended period
-- operator can see whether listening is active
-- no continuous raw recording file is required yet
+- a user can start access and end access on the device
+- when access ends, prior capture content is no longer casually visible in the
+  shared UI
+- the left-sidebar settings entry can show the shared-device scope and current
+  access state
+- stale interrupted summary state does not require developer-only recovery
 
 Deferred:
 
-- utterance save
-- ASR
-- topic grouping
+- idle-timeout handling
+- badge integration
+- SSO integration
 
-## Milestone 3: VAD-based utterance capture
+### Milestone 11: Capture session refactor
 
 Goal:
 
-- convert continuous monitoring into utterance artifacts inside one session
+- rename and re-scope the current session model into `CaptureSession`
 
 Scope:
 
-- VAD integration
-- 3-second silence rule for utterance boundaries
-- attach utterances to the currently open session
-- one audio artifact per utterance
-- utterance persistence
-- utterance card list / inspection UI
+- domain rename from current `Session`
+- persistence migration
+- attach `organization_id`, `workspace_id`, `device_id`,
+  `started_by_account_id`, and optional `access_session_id`
+- update UI and services to use the new language
 
 Exit criteria:
 
-- normal speech creates utterance records automatically
-- silence >= 3 seconds creates a new utterance boundary
-- utterances appear under the active session in time order
-- saved utterances are visible after restart
+- captured content belongs to `CaptureSession`
+- existing topic, utterance, and job flows continue to work under the new root
 
 Deferred:
 
-- ASR
-- topic grouping
-- summarization
+- retention jobs
 
-## Milestone 4: Local utterance ASR
+### Milestone 12: Privacy-safe room flow
 
 Goal:
 
-- transcribe saved utterances locally and reliably
+- enforce a safe shared-room operator flow around the existing capture feature
 
 Scope:
 
-- explicit model-path management
-- local ASR adapter
-- transcript file persistence
-- utterance transcription status
-- retryable failure handling
+- require active access before capture when policy demands it
+- reset UI after logout or timeout
+- block reopening prior captures from the shared UI by default
+- define operator-visible closed-state behavior
 
 Exit criteria:
 
-- one saved utterance can be transcribed locally with no cloud access
-- transcript result is attached to the utterance
-- failure is visible and retryable from the UI
+- the next meeting cannot browse the prior meeting by default
+- the device returns to a neutral state after access ends
 
 Deferred:
 
-- topic grouping
-- summarization
+- physical badge hardware
 
-## Milestone 5: Topic formation
+### Milestone 13: Retention and purge policy
 
 Goal:
 
-- group utterances into topics using the 1-minute silence-gap rule
+- make data retention explicit and enforceable
 
 Scope:
 
-- topic creation logic
-- topic extension logic
-- topic closure logic
-- topic persistence
-- topic detail UI
+- device policy model
+- purge scheduling and execution
+- purge diagnostics and audit evidence
+- delete or seal audio, transcripts, summaries, and job artifacts according to
+  policy
 
 Exit criteria:
 
-- utterances within 1 minute stay in one topic
-- utterances separated by >= 1 minute start a new topic
-- topic boundaries survive restart
+- one device policy can automatically purge expired meeting artifacts
+- purge behavior is inspectable in diagnostics or logs
 
 Deferred:
 
-- session-level wrap-up
-- knowledge projections
+- remote policy sync
 
-## Milestone 6: Local topic summarization
+### Milestone 14: On-site output flow
 
 Goal:
 
-- generate a usable local summary per topic
+- make room-device output practical without turning the device into a permanent
+  archive browser
 
 Scope:
 
-- topic prompt contract
-- local summarizer adapter
-- topic summary persistence
-- summary retry behavior
+- copy/export/print policy hooks
+- bounded operator result screen
+- safe closeout after output
 
 Exit criteria:
 
-- a topic can produce a local summary with no cloud dependency
-- failed summary jobs do not corrupt the topic state
+- the current meeting can review and retrieve results on-site
+- the output flow does not weaken between-meeting privacy
 
 Deferred:
 
-- session-level synthesis
-- knowledge indexing
+- cloud delivery
 
-## Milestone 7: Session wrap-up
+### Milestone 15: Auth integration adapters
 
 Goal:
 
-- define and implement the first operator-facing session close and wrap-up flow
+- prepare for real organizational authentication methods
 
 Scope:
 
-- explicit session close behavior
-- aggregate topics into one session-level wrap-up
-- session summary or wrap-up generation
-- exportable session representation
+- adapter boundary for badge, SSO, PIN, QR, or equivalent
+- preserve `AccessSession` semantics while swapping the auth source
 
 Exit criteria:
 
-- operator can inspect one closed session composed of topics
-- session wrap-up can be exported or copied in a stable format
+- the codebase has a clear auth adapter seam
+- local mock auth can be replaced without redesigning capture logic
 
 Deferred:
 
-- advanced knowledge UX
-
-## Milestone 8: Knowledge projection
-
-Goal:
-
-- persist the captured structure in a form that can later support knowledge use
-
-Scope:
-
-- stable identifiers
-- local search-ready schema
-- metadata needed for later embeddings or retrieval
-- non-destructive migration strategy
-
-Exit criteria:
-
-- sessions, utterances, and topics can be traversed and queried locally
-- schema is stable enough for future knowledge features
-
-Deferred:
-
-- full RAG
-- chat UX
-
-## Milestone 9: Hardening
-
-Goal:
-
-- make the ambient loop reliable enough for repeated daily use
-
-Scope:
-
-- restart recovery
-- job retry policy
-- model-path validation
-- longer capture tests
-- disk-growth controls
-
-Exit criteria:
-
-- the system can run through a normal real-world usage period without manual
-  intervention
-- common failure modes are recoverable from the product surface
-
-Deferred:
-
-- multimodal expansion
-- collaboration
-
-## Historical decisions now reflected in the PoC
-
-- One operator-opened session is the boundary for one wrap-up.
-- Topic summaries are operator-triggered from the UI, not eager background
-  jobs.
-- Failed utterance ASR does not automatically block topic summarization; only
-  utterances with available transcripts are summarized.
-- Raw utterance audio is retained locally after transcription as inspectable
-  evidence.
+- final enterprise identity provider choice

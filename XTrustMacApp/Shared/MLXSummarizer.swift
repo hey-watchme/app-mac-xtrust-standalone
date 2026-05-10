@@ -1,20 +1,31 @@
 import AppCore
+import Darwin
 import Foundation
 
 struct MLXSummarizerConfiguration: Sendable {
     let pythonExecutablePath: String
     let modelDirectory: String
     let maxTokens: Int
+    let maxPromptCharacters: Int
+    let requiredAvailableMemoryBytes: UInt64
 
     var modelReady: Bool {
         var isDir: ObjCBool = false
         return FileManager.default.fileExists(atPath: modelDirectory, isDirectory: &isDir) && isDir.boolValue
     }
 
-    init(pythonExecutablePath: String, modelDirectory: String, maxTokens: Int = 512) {
+    init(
+        pythonExecutablePath: String,
+        modelDirectory: String,
+        maxTokens: Int = 512,
+        maxPromptCharacters: Int = 18_000,
+        requiredAvailableMemoryBytes: UInt64 = 8 * 1_024 * 1_024 * 1_024
+    ) {
         self.pythonExecutablePath = pythonExecutablePath
         self.modelDirectory = modelDirectory
         self.maxTokens = maxTokens
+        self.maxPromptCharacters = maxPromptCharacters
+        self.requiredAvailableMemoryBytes = requiredAvailableMemoryBytes
     }
 
     static func developmentDefault(modelsRootDirectory: String) -> MLXSummarizerConfiguration {
@@ -66,6 +77,8 @@ struct MLXSummarizer: Summarizer, Sendable {
         }
 
         let prompt = buildPrompt(for: request)
+        try validatePromptSize(prompt)
+        try validateMemoryBudget()
         let result = try await runProcess(prompt: prompt)
 
         guard result.exitCode == 0 else {
@@ -152,6 +165,25 @@ struct MLXSummarizer: Summarizer, Sendable {
         ## 出力形式
         \(outputFormat)
         """
+    }
+
+    private func validatePromptSize(_ prompt: String) throws {
+        guard prompt.count <= configuration.maxPromptCharacters else {
+            throw MLXSummarizerError.promptTooLarge(
+                limit: configuration.maxPromptCharacters,
+                actual: prompt.count
+            )
+        }
+    }
+
+    private func validateMemoryBudget() throws {
+        let snapshot = try SystemMemorySnapshot.capture()
+        guard snapshot.availableBytes >= configuration.requiredAvailableMemoryBytes else {
+            throw MLXSummarizerError.insufficientMemory(
+                availableBytes: snapshot.availableBytes,
+                requiredBytes: configuration.requiredAvailableMemoryBytes
+            )
+        }
     }
 
     private func contextDescription(for profile: Session.MeetingContextProfile) -> String {
@@ -311,6 +343,9 @@ enum MLXSummarizerError: LocalizedError {
     case modelMissing(expectedPath: String)
     case processFailed(exitCode: Int32, stderr: String)
     case emptyOutput
+    case promptTooLarge(limit: Int, actual: Int)
+    case insufficientMemory(availableBytes: UInt64, requiredBytes: UInt64)
+    case memoryProbeFailed(message: String)
 
     var errorDescription: String? {
         switch self {
@@ -320,6 +355,47 @@ enum MLXSummarizerError: LocalizedError {
             return "mlx_lm.generate exited with code \(exitCode). stderr: \(stderr)"
         case .emptyOutput:
             return "mlx_lm.generate produced no output."
+        case let .promptTooLarge(limit, actual):
+            return "要約入力が大きすぎるため実行を中止しました。Prompt size: \(actual) chars. Limit: \(limit) chars."
+        case let .insufficientMemory(availableBytes, requiredBytes):
+            return "メモリ不足のため要約を開始しません。Available: \(ByteCountFormatter.string(fromByteCount: Int64(availableBytes), countStyle: .memory)). Required: \(ByteCountFormatter.string(fromByteCount: Int64(requiredBytes), countStyle: .memory))."
+        case let .memoryProbeFailed(message):
+            return "メモリ状態を確認できないため要約を開始しませんでした。\(message)"
         }
+    }
+}
+
+struct SystemMemorySnapshot: Sendable {
+    let availableBytes: UInt64
+
+    static func capture() throws -> SystemMemorySnapshot {
+        let host = mach_host_self()
+
+        var pageSize: vm_size_t = 0
+        guard host_page_size(host, &pageSize) == KERN_SUCCESS else {
+            throw MLXSummarizerError.memoryProbeFailed(message: "host_page_size failed")
+        }
+
+        var vmStats = vm_statistics64()
+        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64_data_t>.stride / MemoryLayout<integer_t>.stride)
+
+        let result = withUnsafeMutablePointer(to: &vmStats) { statsPointer in
+            statsPointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { reboundPointer in
+                host_statistics64(host, HOST_VM_INFO64, reboundPointer, &count)
+            }
+        }
+
+        guard result == KERN_SUCCESS else {
+            throw MLXSummarizerError.memoryProbeFailed(message: "host_statistics64 failed: \(result)")
+        }
+
+        let availablePageCount =
+            UInt64(vmStats.free_count) +
+            UInt64(vmStats.inactive_count) +
+            UInt64(vmStats.speculative_count)
+
+        return SystemMemorySnapshot(
+            availableBytes: availablePageCount * UInt64(pageSize)
+        )
     }
 }

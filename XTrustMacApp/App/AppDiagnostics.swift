@@ -4,8 +4,14 @@ import Foundation
 struct AppDiagnostics {
     let workspaceRoot: URL
     let databaseURL: URL
+    let sharedDeviceContext: SharedDeviceContext
+    let accessActive: Bool
+    let activeAccessAccountDisplayName: String?
     let whisperModelPath: String
     let mlxModelDirectory: String
+    let mlxRequiredAvailableMemoryBytes: UInt64
+    let currentAvailableMemoryBytes: UInt64?
+    let recoveredStaleSummaryCount: Int
     let audioReady: Bool
     let transcriptsReady: Bool
     let summariesReady: Bool
@@ -17,6 +23,10 @@ struct AppDiagnostics {
 
     init(
         paths: WorkspacePaths,
+        sharedDeviceContext: SharedDeviceContext,
+        accessActive: Bool = false,
+        activeAccessAccountDisplayName: String? = nil,
+        recoveredStaleSummaryCount: Int = 0,
         fileManager: FileManager = .default,
         recordingActive: Bool = false,
         whisperConfiguration: WhisperCLITranscriberConfiguration,
@@ -24,8 +34,14 @@ struct AppDiagnostics {
     ) {
         self.workspaceRoot = paths.root
         self.databaseURL = paths.database
+        self.sharedDeviceContext = sharedDeviceContext
+        self.accessActive = accessActive
+        self.activeAccessAccountDisplayName = activeAccessAccountDisplayName
         self.whisperModelPath = whisperConfiguration.expectedModelFilePath
         self.mlxModelDirectory = mlxConfiguration.modelDirectory
+        self.mlxRequiredAvailableMemoryBytes = mlxConfiguration.requiredAvailableMemoryBytes
+        self.currentAvailableMemoryBytes = try? SystemMemorySnapshot.capture().availableBytes
+        self.recoveredStaleSummaryCount = recoveredStaleSummaryCount
         self.audioReady = fileManager.fileExists(atPath: paths.audio.path(percentEncoded: false))
         self.transcriptsReady = fileManager.fileExists(atPath: paths.transcripts.path(percentEncoded: false))
         self.summariesReady = fileManager.fileExists(atPath: paths.summaries.path(percentEncoded: false))

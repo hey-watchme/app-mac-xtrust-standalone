@@ -12,17 +12,27 @@ final class AppState: ObservableObject {
         TranscriptArtifactStore
 
     let paths: WorkspacePaths
+    let sharedDeviceContext: SharedDeviceContext
+    let accessSessionService: AccessSessionService
+    let staleSummaryRecoveryService: StaleSummaryRecoveryService
     let sessionService: SessionService
     let persistenceStore: any SessionPersistenceStore
     let microphoneRecorder: MicrophoneRecorder
     let audioPlaybackController: AudioPlaybackController
     let whisperTranscriber: WhisperCLITranscriber
     let gemmaSummarizer: MLXSummarizer
+    let summarySummarizer: any Summarizer
     let transcriptionJobRunner: TranscriptionJobRunner
     let topicSummaryRunner: TopicSummaryRunner
     let captureRuntime: CaptureRuntime
     private var transcriptionRefreshTask: Task<Void, Never>?
     private var summaryRefreshTask: Task<Void, Never>?
+    private var summaryQueueTailTask: Task<Void, Never>?
+    private var summaryQueueTailToken: UUID?
+    private var recoveredStaleSummaryCount: Int
+    private var visibleSessionIDs: Set<UUID>
+    @Published var activeAccessSession: AccessSession?
+    @Published var isShowingSettings: Bool
     @Published var selectedSessionID: Session.ID?
     @Published var activePlaybackFilePath: String?
     @Published var sessions: [Session]
@@ -33,63 +43,94 @@ final class AppState: ObservableObject {
     @Published var isSpeechActive: Bool = false
     @Published var meetingSummaryText: String?
     @Published var isSummarizingMeeting: Bool = false
+    @Published var isSummaryQueueBusy: Bool = false
+    @Published var maintenanceMessage: String?
 
     static func bootstrap() throws -> AppState {
         let runtime = try AppRuntime.bootstrap()
         return AppState(
             paths: runtime.paths,
+            sharedDeviceContext: runtime.sharedDeviceContext,
+            accessSessionService: runtime.accessSessionService,
+            staleSummaryRecoveryService: runtime.staleSummaryRecoveryService,
             sessionService: runtime.sessionService,
             persistenceStore: runtime.sessionStore,
             microphoneRecorder: runtime.microphoneRecorder,
             audioPlaybackController: runtime.audioPlaybackController,
             whisperTranscriber: runtime.whisperTranscriber,
             gemmaSummarizer: runtime.gemmaSummarizer,
+            summarySummarizer: runtime.summarySummarizer,
             transcriptionJobRunner: runtime.transcriptionJobRunner,
             topicSummaryRunner: runtime.topicSummaryRunner,
             captureRuntime: runtime.captureRuntime,
+            activeAccessSession: runtime.initialAccessSession,
+            isShowingSettings: false,
             selectedSessionID: runtime.initialSessions.first?.id,
             activePlaybackFilePath: nil,
+            recoveredStaleSummaryCount: runtime.initialRecoveredStaleSummaryCount,
+            visibleSessionIDs: Set(runtime.initialSessions.map(\.id)),
             sessions: runtime.initialSessions,
             selectedSessionDetail: nil,
             diagnostics: runtime.diagnostics,
-            errorMessage: nil
+            errorMessage: nil,
+            maintenanceMessage: runtime.initialRecoveredStaleSummaryCount > 0
+                ? "前回中断された要約を \(runtime.initialRecoveredStaleSummaryCount) 件回復しました。"
+                : nil
         )
     }
 
     init(
         paths: WorkspacePaths,
+        sharedDeviceContext: SharedDeviceContext,
+        accessSessionService: AccessSessionService,
+        staleSummaryRecoveryService: StaleSummaryRecoveryService,
         sessionService: SessionService,
         persistenceStore: any SessionPersistenceStore,
         microphoneRecorder: MicrophoneRecorder,
         audioPlaybackController: AudioPlaybackController,
         whisperTranscriber: WhisperCLITranscriber,
         gemmaSummarizer: MLXSummarizer,
+        summarySummarizer: any Summarizer,
         transcriptionJobRunner: TranscriptionJobRunner,
         topicSummaryRunner: TopicSummaryRunner,
         captureRuntime: CaptureRuntime,
+        activeAccessSession: AccessSession?,
+        isShowingSettings: Bool,
         selectedSessionID: Session.ID?,
         activePlaybackFilePath: String?,
+        recoveredStaleSummaryCount: Int,
+        visibleSessionIDs: Set<UUID>,
         sessions: [Session],
         selectedSessionDetail: SessionDetailSnapshot?,
         diagnostics: AppDiagnostics,
-        errorMessage: String?
+        errorMessage: String?,
+        maintenanceMessage: String?
     ) {
         self.paths = paths
+        self.sharedDeviceContext = sharedDeviceContext
+        self.accessSessionService = accessSessionService
+        self.staleSummaryRecoveryService = staleSummaryRecoveryService
         self.sessionService = sessionService
         self.persistenceStore = persistenceStore
         self.microphoneRecorder = microphoneRecorder
         self.audioPlaybackController = audioPlaybackController
         self.whisperTranscriber = whisperTranscriber
         self.gemmaSummarizer = gemmaSummarizer
+        self.summarySummarizer = summarySummarizer
         self.transcriptionJobRunner = transcriptionJobRunner
         self.topicSummaryRunner = topicSummaryRunner
         self.captureRuntime = captureRuntime
+        self.activeAccessSession = activeAccessSession
+        self.isShowingSettings = isShowingSettings
         self.selectedSessionID = selectedSessionID
         self.activePlaybackFilePath = activePlaybackFilePath
+        self.recoveredStaleSummaryCount = recoveredStaleSummaryCount
+        self.visibleSessionIDs = visibleSessionIDs
         self.sessions = sessions
         self.selectedSessionDetail = selectedSessionDetail
         self.diagnostics = diagnostics
         self.errorMessage = errorMessage
+        self.maintenanceMessage = maintenanceMessage
         self.audioPlaybackController.onPlaybackStopped = { [weak self] in
             self?.activePlaybackFilePath = nil
         }
@@ -115,9 +156,15 @@ final class AppState: ObservableObject {
     }
 
     func createSession() {
+        guard activeAccessSession != nil else {
+            errorMessage = "利用開始後にセッションを作成してください。"
+            return
+        }
         do {
             let session = try sessionService.createSession()
+            visibleSessionIDs.insert(session.id)
             sessions.insert(session, at: 0)
+            isShowingSettings = false
             selectedSessionID = session.id
             refreshSelectedSessionDetail()
             errorMessage = nil
@@ -152,6 +199,9 @@ final class AppState: ObservableObject {
 
     func startListening() async {
         do {
+            guard activeAccessSession != nil else {
+                throw AppStateAccessError.accessRequired
+            }
             guard let sessionID = selectedSessionID else { return }
             guard await microphoneRecorder.requestPermission() else {
                 throw MicrophoneRecorderError.permissionDenied
@@ -185,7 +235,7 @@ final class AppState: ObservableObject {
             errorMessage = nil
             startTranscriptionRefreshLoop(selecting: sessionID)
             defer { stopTranscriptionRefreshLoop() }
-            try await transcriptionJobRunner.run(
+            _ = try await transcriptionJobRunner.run(
                 utteranceID: utteranceID,
                 recordingArtifact: artifact
             )
@@ -203,7 +253,7 @@ final class AppState: ObservableObject {
             do {
                 startTranscriptionRefreshLoop(selecting: sessionID)
                 defer { stopTranscriptionRefreshLoop() }
-                try await transcriptionJobRunner.run(
+                _ = try await transcriptionJobRunner.run(
                     utteranceID: utterance.id,
                     recordingArtifact: artifact
                 )
@@ -216,7 +266,9 @@ final class AppState: ObservableObject {
     }
 
     private func reloadSessions(selecting sessionID: Session.ID?) throws {
-        sessions = try sessionService.loadSessions()
+        sessions = try sessionService
+            .loadSessions()
+            .filter { visibleSessionIDs.contains($0.id) }
         selectedSessionID = sessionID ?? sessions.first?.id
         refreshSelectedSessionDetail()
     }
@@ -224,6 +276,10 @@ final class AppState: ObservableObject {
     private func refreshDiagnostics() {
         diagnostics = AppDiagnostics(
             paths: paths,
+            sharedDeviceContext: sharedDeviceContext,
+            accessActive: activeAccessSession != nil,
+            activeAccessAccountDisplayName: activeAccessAccountDisplayName,
+            recoveredStaleSummaryCount: recoveredStaleSummaryCount,
             recordingActive: captureRuntime.isCapturing,
             whisperConfiguration: whisperTranscriber.configuration,
             mlxConfiguration: gemmaSummarizer.configuration
@@ -251,25 +307,19 @@ final class AppState: ObservableObject {
         transcriptionRefreshTask = nil
     }
 
-    func summarizeTopic(topicID: UUID) async {
+    func requestTopicSummary(topicID: UUID) {
         guard let sessionID = selectedSessionID,
               let detail = selectedSessionDetail,
               let topic = detail.topics.first(where: { $0.id == topicID }) else {
             errorMessage = "Topic not found."
             return
         }
-        do {
-            errorMessage = nil
-            startSummaryRefreshLoop(selecting: sessionID)
-            defer { stopSummaryRefreshLoop() }
-            try await topicSummaryRunner.run(
+        enqueueSummaryJob {
+            await self.performTopicSummary(
+                sessionID: sessionID,
                 topic: topic,
                 contextProfile: detail.session.meetingContextProfile
             )
-            try reloadSessions(selecting: sessionID)
-        } catch {
-            try? reloadSessions(selecting: sessionID)
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -378,6 +428,7 @@ final class AppState: ObservableObject {
                     transcriptArtifacts: transcriptArtifacts
                 )
             }
+            .filter { !$0.isDiscardedNoise }
 
             selectedSessionDetail = SessionDetailSnapshot(
                 session: session,
@@ -396,32 +447,186 @@ final class AppState: ObservableObject {
             .max { lhs, rhs in lhs.createdAt < rhs.createdAt }
     }
 
+    var activeAccessAccountDisplayName: String? {
+        guard let activeAccessSession else { return nil }
+        if activeAccessSession.accountID == sharedDeviceContext.bootstrapAccount.id {
+            return sharedDeviceContext.bootstrapAccount.displayName
+        }
+        return nil
+    }
+
+    func beginLocalAccess() {
+        do {
+            let session = try accessSessionService.beginAccess(
+                deviceID: sharedDeviceContext.device.id,
+                accountID: sharedDeviceContext.bootstrapAccount.id,
+                authenticationMethod: .localMock
+            )
+            activeAccessSession = session
+            isShowingSettings = false
+            visibleSessionIDs = []
+            sessions = []
+            selectedSessionID = nil
+            selectedSessionDetail = nil
+            meetingSummaryText = nil
+            isSummarizingMeeting = false
+            errorMessage = nil
+            refreshDiagnostics()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func logoutActiveAccess() {
+        guard let activeAccessSession else { return }
+        if isListening { stopListening() }
+        stopPlayback()
+        do {
+            _ = try accessSessionService.endAccess(activeAccessSession, status: .loggedOut)
+            self.activeAccessSession = nil
+            isShowingSettings = false
+            visibleSessionIDs = []
+            sessions = []
+            selectedSessionID = nil
+            selectedSessionDetail = nil
+            meetingSummaryText = nil
+            isSummarizingMeeting = false
+            errorMessage = nil
+            maintenanceMessage = nil
+            refreshDiagnostics()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func selectSession(_ sessionID: Session.ID?) {
+        isShowingSettings = false
         selectedSessionID = sessionID
         meetingSummaryText = nil
         refreshSelectedSessionDetail()
     }
 
-    func summarizeMeeting() async {
-        guard let detail = selectedSessionDetail else { return }
+    func showSettings() {
+        isShowingSettings = true
+        selectedSessionID = nil
+        meetingSummaryText = nil
+        refreshSelectedSessionDetail()
+    }
+
+    func recoverStaleSummaries() {
+        guard !isSummaryQueueBusy else {
+            errorMessage = "要約処理中は stuck summary を解除できません。完了後に再実行してください。"
+            return
+        }
+
+        do {
+            let recoveredCount = try staleSummaryRecoveryService.recover()
+            recoveredStaleSummaryCount += recoveredCount
+            maintenanceMessage = recoveredCount == 0
+                ? "解除対象の stuck summary はありません。"
+                : "stuck summary を \(recoveredCount) 件解除しました。"
+            errorMessage = nil
+            refreshDiagnostics()
+            refreshSelectedSessionDetail()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func enqueueSummaryJob(
+        _ operation: @escaping @MainActor () async -> Void
+    ) {
+        errorMessage = nil
+        isSummaryQueueBusy = true
+
+        let previousTask = summaryQueueTailTask
+        let token = UUID()
+        summaryQueueTailToken = token
+        summaryQueueTailTask = Task { @MainActor [weak self] in
+            _ = await previousTask?.result
+            guard let self else { return }
+            await operation()
+            self.finishSummaryJob(token: token)
+        }
+    }
+
+    private func finishSummaryJob(token: UUID) {
+        guard summaryQueueTailToken == token else { return }
+        summaryQueueTailToken = nil
+        summaryQueueTailTask = nil
+        isSummaryQueueBusy = false
+    }
+
+    private func performTopicSummary(
+        sessionID: Session.ID,
+        topic: Topic,
+        contextProfile: Session.MeetingContextProfile
+    ) async {
+        do {
+            startSummaryRefreshLoop(selecting: sessionID)
+            defer { stopSummaryRefreshLoop() }
+            try await topicSummaryRunner.run(
+                topic: topic,
+                contextProfile: contextProfile
+            )
+            try reloadSessions(selecting: sessionID)
+        } catch {
+            try? reloadSessions(selecting: sessionID)
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func performMeetingSummary(
+        sessionID: Session.ID,
+        contextProfile: Session.MeetingContextProfile,
+        topicSummaries: [String]
+    ) async {
+        isSummarizingMeeting = true
+        defer { isSummarizingMeeting = false }
+
+        do {
+            startSummaryRefreshLoop(selecting: sessionID)
+            defer { stopSummaryRefreshLoop() }
+
+            let request = SummarizationRequest(
+                scope: .meeting,
+                contextProfile: contextProfile,
+                transcripts: topicSummaries
+            )
+            meetingSummaryText = try await summarySummarizer.summarize(request: request)
+            try reloadSessions(selecting: sessionID)
+        } catch {
+            try? reloadSessions(selecting: sessionID)
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func requestMeetingSummary() {
+        guard let sessionID = selectedSessionID,
+              let detail = selectedSessionDetail else { return }
         let topicSummaries = detail.topics.compactMap(\.summaryText)
         guard !topicSummaries.isEmpty else {
             errorMessage = "要約できるトピックがありません。先にトピックの要約を実行してください。"
             return
         }
-        isSummarizingMeeting = true
-        errorMessage = nil
-        do {
-            let request = SummarizationRequest(
-                scope: .meeting,
+        enqueueSummaryJob {
+            await self.performMeetingSummary(
+                sessionID: sessionID,
                 contextProfile: detail.session.meetingContextProfile,
-                transcripts: topicSummaries
+                topicSummaries: topicSummaries
             )
-            meetingSummaryText = try await gemmaSummarizer.summarize(request: request)
-        } catch {
-            errorMessage = error.localizedDescription
         }
-        isSummarizingMeeting = false
+    }
+}
+
+private enum AppStateAccessError: LocalizedError {
+    case accessRequired
+
+    var errorDescription: String? {
+        switch self {
+        case .accessRequired:
+            return "利用開始後に録音を開始してください。"
+        }
     }
 }
 
@@ -448,5 +653,9 @@ struct UtteranceDetailSnapshot: Identifiable {
 
     var latestTranscriptArtifact: TranscriptArtifactMetadata? {
         transcriptArtifacts.last
+    }
+
+    var isDiscardedNoise: Bool {
+        latestTranscriptArtifact == nil && latestTranscriptionJob?.status == .discarded
     }
 }

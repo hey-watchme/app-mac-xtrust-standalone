@@ -1,24 +1,12 @@
-# Mac Local-First Architecture
+# Mac Local-First Room Device Architecture
 
-Date: 2026-05-08 JST
+Date: 2026-05-09 JST
 
 ## Objective
 
-Define the architecture before adding more behavior.
+Define the architecture for the next phase of the macOS local-first product.
 
-The app must make the local pipeline predictable. Recording, ASR, topic
-formation, and summarization should each have clear ownership, explicit input
-and output contracts, and persisted state transitions.
-
-Error handling policy:
-
-- do not hide startup or runtime failures behind fallback workspaces
-- do not substitute unavailable services with silent placeholders
-- surface the real error to the operator together with the failed contract
-- use diagnostics to explain the failure, not to continue past it invisibly
-
-The immediate design target is not VAD quality or summary quality. The target
-is a reliable artifact pipeline:
+The first PoC proved the local capture pipeline:
 
 ```text
 session
@@ -29,303 +17,297 @@ session
   -> topic summary job
 ```
 
-## Current design problem
+That vertical slice works, but it assumes a personal or single-operator usage
+shape. The next product shape is different: one organization-owned device in one
+room, used briefly by many different people over time.
 
-The current scaffold grew from a manual demo path:
+## Architectural shift
+
+The new root is not the personal session.
+
+The new root is:
 
 ```text
-press Start Recording
-  -> write one wav file on the session
-press Stop Recording
-  -> mark the session completed
-press Transcribe Recording
-  -> run Whisper directly from the UI state path
-  -> look for a txt file in the shared transcripts directory
+organization
+  -> workspace
+    -> device
+      -> access session
+      -> capture session
 ```
 
-That shape is useful for a smoke test, but it is not a production design.
+This changes the design pressure in three ways:
 
-The weak points are:
+- identity becomes short-lived and replaceable
+- privacy isolation between meetings becomes mandatory
+- retention and purge become first-class behavior
 
-- `Session` is doing too much: it is both the meeting container and the single
-  recording/transcription target.
-- UI actions directly trigger long-running side effects without a durable job
-  boundary.
-- ASR output is written into a shared final directory, so old output can confuse
-  diagnosis.
-- The app assumes a transcript path before the ASR job has produced and
-  validated the artifact.
-- stdout, stderr, exit code, duration, input path, and output files are not
-  persisted as first-class job evidence.
+## Design principles
 
-This is why recent debugging became narrow and reactive. The code did not give
-us a stable state machine to inspect. It only gave us a button path and an error
-string after the fact.
+- treat `Organization` as the root owner of data and policy
+- treat `Device` as the physical execution point
+- treat `Account` as an identity and permission subject, not the data owner
+- separate temporary device access from captured meeting content
+- enforce explicit policy around retention, export, and purge
 
 ## Domain model
 
-### Session
-
-Top-level capture container.
+### Organization
 
 Responsibilities:
 
-- owns topics and utterances
-- represents one operator-opened meeting or capture window
-- tracks lifecycle: `draft`, `listening`, `paused`, `closed`, `failed`
+- owns workspaces and devices
+- owns policy defaults
+- is the top-level data ownership boundary
+
+### Workspace
+
+Responsibilities:
+
+- groups devices under one operating unit
+- usually maps to a branch, office, site, or department
+
+### Device
+
+Responsibilities:
+
+- represents one installed room or field device
+- anchors physical-local behavior
+- owns device policy such as login requirement, timeout, and purge policy
+
+### Account
+
+Responsibilities:
+
+- represents one person who may use the device
+- participates in permission checks and audit trails
 
 Keep out:
 
-- individual audio file paths
-- individual transcript text
-- raw ASR process details
+- ownership of captured meeting data
+
+### OrganizationMembership
+
+Responsibilities:
+
+- links accounts to organizations
+- carries roles and authorization state
+
+### AccessSession
+
+Responsibilities:
+
+- represents a temporary grant to use one device
+- starts on authentication or device unlock
+- ends on logout, inactivity, timeout, or forced reset
+
+Keep out:
+
+- capture artifacts
+- topic state
+- transcript state
+
+### CaptureSession
+
+Responsibilities:
+
+- represents one meeting or bounded capture activity
+- belongs to one organization, one workspace, and one device
+- may record which access session and account initiated it
+- owns topics and utterances
+
+This is the renamed and narrowed successor to the current `Session`.
 
 ### Topic
 
-Cluster of utterances inside one session.
-
 Responsibilities:
 
-- owns a contiguous or semantically grouped subset of utterances
-- tracks summary status
-- stores topic-level summary artifacts
-
-Keep out:
-
-- microphone capture state
-- per-utterance transcription process details
+- groups utterances inside one capture session
+- stores topic-level summary state
 
 ### Utterance
 
-Smallest persisted speech unit.
-
 Responsibilities:
 
-- points to one finalized audio artifact
+- points to one finalized recording artifact
 - owns transcription lifecycle
-- can later be assigned to a topic
+- belongs to one capture session
 
-Lifecycle:
+## Session split
+
+The word `session` is overloaded and must be separated in both code and docs.
+
+### AccessSession lifecycle
 
 ```text
-detected
-  -> recording
-  -> recorded
-  -> transcriptionQueued
-  -> transcribing
-  -> transcribed
+requested
+  -> active
+  -> idleTimedOut | loggedOut | revoked
+```
+
+### CaptureSession lifecycle
+
+```text
+draft
+  -> listening
+  -> paused
+  -> closed
+  -> purged
   -> failed
 ```
 
 Rules:
 
-- an utterance cannot be transcribed until its audio artifact is finalized
-- an utterance transcription failure must not corrupt the session
-- retrying ASR creates a new job attempt, not an overwrite of history
+- a capture session may require an active access session before it can start
+- ending an access session does not necessarily delete a capture session
+  immediately, but it must make the prior content non-browsable on the shared
+  UI unless policy explicitly allows otherwise
+- purge is a separate state transition, not an implicit side effect hidden from
+  diagnostics
 
-## Artifact model
+## Ownership and foreign key direction
 
-Artifacts are files that have passed validation and can be referenced from
-SQLite.
-
-### Recording artifact
-
-Created only after recording has stopped and the file has been verified.
-
-Required metadata:
-
-- `artifact_id`
-- `utterance_id`
-- final `audio_file_path`
-- byte size
-- duration
-- sample rate
-- channel count
-- created timestamp
-
-Validation:
-
-- file exists
-- file size is greater than zero
-- duration is greater than the minimum useful utterance duration
-- file path is inside the app-managed workspace
-
-### Transcript artifact
-
-Created only after a transcription job has produced and validated text.
-
-Required metadata:
-
-- `artifact_id`
-- `utterance_id`
-- final `transcript_file_path`
-- text
-- model identifier
-- language
-- created timestamp
-
-Validation:
-
-- transcript file exists
-- transcript text can be read as UTF-8
-- transcript output belongs to the current job workspace
-
-## Job model
-
-Any long-running or fallible operation must be represented as a job.
-
-### Transcription job
-
-Input:
-
-- one finalized recording artifact
-- one model configuration
-- one dedicated job working directory
-
-Output:
-
-- one transcript artifact on success
-- one failed job record on failure
-
-Execution contract:
+Recommended ownership graph:
 
 ```text
-create job directory
-  -> run ASR sidecar with job directory as output_dir
-  -> wait for process completion
-  -> capture stdout, stderr, exit code, and duration
-  -> inspect only the job directory
-  -> require exactly one txt output for the input audio
-  -> move validated transcript to final transcript storage
-  -> update utterance transcription state
+Organization --< Workspace --< Device
+Account --< OrganizationMembership >-- Organization
+Device --< AccessSession >-- Account
+Device --< CaptureSession
+Account --< CaptureSession (started_by)
+AccessSession --< CaptureSession (optional link)
+CaptureSession --< Topic --< Utterance
+Utterance --< RecordingArtifact
+Utterance --< TranscriptionJob --< TranscriptArtifact
 ```
+
+Recommended foreign keys:
+
+- `workspaces.organization_id`
+- `devices.organization_id`
+- `devices.workspace_id`
+- `organization_memberships.organization_id`
+- `organization_memberships.account_id`
+- `access_sessions.device_id`
+- `access_sessions.account_id`
+- `capture_sessions.organization_id`
+- `capture_sessions.workspace_id`
+- `capture_sessions.device_id`
+- `capture_sessions.started_by_account_id`
+- `capture_sessions.access_session_id`
+- `topics.capture_session_id`
+- `utterances.capture_session_id`
+
+## Policy model
+
+Shared room privacy depends on policy, not only on UI courtesy.
+
+At minimum the device policy model should support:
+
+- `require_login_to_start_capture`
+- `auto_logout_after_seconds`
+- `retain_capture_after_logout`
+- `purge_after_minutes`
+- `allow_print`
+- `allow_export`
+- `allow_reopen_closed_capture`
+
+The architecture must allow these policies to be evaluated without rewriting the
+capture pipeline itself.
+
+## Storage model
+
+Durable storage stays local and inspectable.
+
+Recommended local stores:
+
+- SQLite for metadata, lifecycle state, policies, and audit evidence
+- Application Support directories for audio, transcripts, summaries, and job
+  workspaces
+
+The current artifact pipeline remains valid:
+
+```text
+capture session
+  -> utterance recording artifact
+  -> transcription job
+  -> transcript artifact
+  -> topic summary
+```
+
+What changes is the scope attached to the artifacts:
+
+- every durable record should be attributable to `organization + workspace +
+  device`
+
+## Summary runtime safety
+
+Topic and meeting summarization are local heavy jobs and must be treated as a
+bounded shared device resource.
 
 Rules:
 
-- sidecars must not write directly to final artifact directories
-- shared final directories are storage locations, not job workspaces
-- stdout and stderr are diagnostic artifacts and should be retained for failed
-  jobs
-- process success is not enough; output validation is mandatory
-- if validation or process setup fails, show that failure directly instead of
-  falling back to a weaker path
+- the device must not launch multiple MLX summary subprocesses concurrently from
+  repeated button presses
+- summary admission can reject work before launch when prompt size or available
+  memory is outside the safe envelope
+- any `summary_status = running` state found after app restart is stale by
+  definition and must be recoverable without direct SQLite intervention
+- access history and purge history should be independently inspectable
 
-## Layering
+## Security and privacy boundaries
 
-```text
-XTrustMacApp
-  -> AppRuntime
-    -> AppCore
-      -> Ports
-        -> Infrastructure adapters
-          -> SQLite / filesystem / sidecar processes
-```
+### UI boundary
 
-### `XTrustMacApp`
+- after logout or timeout, the device must reset to a neutral screen
+- prior capture content must not remain open in the shared view
 
-Responsibilities:
+### Data boundary
 
-- app entry point
-- window and navigation structure
-- macOS permission handling
-- operator-facing screens and status
-- dispatch user intents to application services
+- prior meeting data may exist temporarily according to retention policy
+- existence on disk does not imply operator visibility
+- visibility must be gated by access state and policy
 
-Keep out:
+### Purge boundary
 
-- SQL
-- raw process execution
-- path naming rules
-- ASR output validation
-- domain state transitions
+- when policy requires purge, delete audio, transcripts, summaries, and job
+  artifacts together
+- purge should be observable as a first-class job or event
 
-### `AppRuntime`
+## Application services
 
-Responsibilities:
+Recommended services for the redesign:
 
-- bootstrap `WorkspacePaths`
-- initialize infrastructure adapters
-- wire stores, artifact services, and job runners into AppCore services
+- `OrganizationBootstrapService`
+- `DeviceBootstrapService`
+- `AccessSessionService`
+- `CaptureSessionService`
+- `DevicePolicyService`
+- `RetentionService`
+- existing `TopicAssignmentService`
+- existing transcription and summarization runners
 
-Keep out:
+## Migration strategy
 
-- SwiftUI view logic
-- business state transitions
-- ASR prompt or output rules
+Do not bolt the new concepts into the current schema ad hoc.
 
-### `AppCore`
+Recommended order:
 
-Responsibilities:
+1. add new root tables: organization, workspace, device, account, membership
+2. add access session and device policy tables
+3. introduce `CaptureSession` naming in domain and persistence layers
+4. attach current content records to the new root identifiers
+5. add UI reset and retention flows
 
-- `Session`, `Topic`, `Utterance`
-- artifact metadata models
-- job models and state transitions
-- application services for session lifecycle, recording completion,
-  transcription scheduling, and topic assignment
-- ports for storage, filesystem artifacts, sidecars, and clock
+## Why this refactor is necessary
 
-Keep out:
+The current PoC is valid for proving local ASR and local summarization.
 
-- `SwiftUI`
-- `AppKit`
-- hard-coded user-specific paths
-- direct `Process` usage
+It is not yet valid for:
 
-### Infrastructure adapters
+- a shared room device
+- organization-owned deployment
+- rapid account turnover
+- strong between-meeting privacy
+- policy-driven logout and purge
 
-Responsibilities:
-
-- SQLite-backed stores
-- app workspace path resolution
-- atomic file movement
-- sidecar process execution
-- artifact validation
-
-Adapters must implement AppCore ports and remain replaceable.
-
-## Required ports
-
-The next implementation should introduce these boundaries before adding more
-product behavior:
-
-- `SessionStore`
-- `TopicStore`
-- `UtteranceStore`
-- `RecordingArtifactStore`
-- `TranscriptionJobStore`
-- `ArtifactFileStore`
-- `Transcriber`
-- `ProcessRunner`
-- `Clock`
-
-## Sidecar rules
-
-Sidecars are external programs such as Whisper and later llama.cpp.
-
-Rules:
-
-- do not execute sidecars from UI code
-- do not let sidecars write directly into final artifact directories
-- do not infer success from exit code alone
-- capture command, arguments, stdout, stderr, exit code, duration, input files,
-  and generated output files
-- make every failed sidecar run inspectable after app restart
-
-## First design milestone
-
-Before more VAD or topic work, implement the predictable ASR job boundary:
-
-```text
-existing wav fixture
-  -> TranscriptionJob
-  -> isolated job directory
-  -> validated transcript artifact
-  -> persisted utterance transcription state
-```
-
-Exit criteria:
-
-- the same fixture wav produces the same transcript artifact path every time
-- stale files in `transcripts/` cannot affect job success or failure
-- failures preserve enough evidence to explain what happened without rerunning
-  the app
+The redesign is therefore structural, not cosmetic.

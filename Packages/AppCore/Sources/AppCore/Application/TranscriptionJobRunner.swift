@@ -10,6 +10,11 @@ public struct TranscriptionJobRunResult: Sendable {
     }
 }
 
+public enum TranscriptionJobRunOutcome: Sendable {
+    case completed(TranscriptionJobRunResult)
+    case discarded(job: TranscriptionJob, reason: String)
+}
+
 public struct TranscriptionJobRunner: Sendable {
     private let paths: WorkspacePaths
     private let jobStore: any TranscriptionJobStore
@@ -35,7 +40,7 @@ public struct TranscriptionJobRunner: Sendable {
     public func run(
         utteranceID: UUID,
         recordingArtifact: RecordingArtifactMetadata
-    ) async throws -> TranscriptionJobRunResult {
+    ) async throws -> TranscriptionJobRunOutcome {
         let jobID = UUID()
         let workingDirectoryURL = paths.transcriptionJobDirectory(jobID: jobID)
         let invocation = transcriber.makeInvocation(
@@ -129,11 +134,26 @@ public struct TranscriptionJobRunner: Sendable {
             )
             try jobStore.updateTranscriptionJob(completedJob)
 
-            return TranscriptionJobRunResult(
-                job: completedJob,
-                transcriptArtifact: transcriptArtifact
+            return .completed(
+                TranscriptionJobRunResult(
+                    job: completedJob,
+                    transcriptArtifact: transcriptArtifact
+                )
             )
         } catch {
+            if isDiscardableValidationError(error) {
+                let discardedJob = runningJob.discarded(
+                    at: clock.now(),
+                    stdoutFilePath: diagnostics.stdoutFilePath,
+                    stderrFilePath: diagnostics.stderrFilePath,
+                    exitCode: processResult.exitCode,
+                    outputFileNames: outputFileNames,
+                    message: error.localizedDescription
+                )
+                try jobStore.updateTranscriptionJob(discardedJob)
+                return .discarded(job: discardedJob, reason: error.localizedDescription)
+            }
+
             let failedJob = runningJob.failed(
                 at: clock.now(),
                 stdoutFilePath: diagnostics.stdoutFilePath,
@@ -144,6 +164,19 @@ public struct TranscriptionJobRunner: Sendable {
             )
             try jobStore.updateTranscriptionJob(failedJob)
             throw error
+        }
+    }
+
+    private func isDiscardableValidationError(_ error: any Error) -> Bool {
+        guard let runnerError = error as? TranscriptionJobRunnerError else {
+            return false
+        }
+
+        switch runnerError {
+        case .transcriptMissing, .transcriptEmpty:
+            return true
+        case .processFailed, .transcriptAmbiguous, .transcriptOutsideJobDirectory:
+            return false
         }
     }
 

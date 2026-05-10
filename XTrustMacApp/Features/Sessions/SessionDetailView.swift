@@ -21,6 +21,7 @@ struct SessionDetailView: View {
     let onCopyWrapUp: () -> Void
     let meetingSummaryText: String?
     let isSummarizingMeeting: Bool
+    let isSummaryQueueBusy: Bool
 
     @State private var showDiagnostics = false
 
@@ -169,7 +170,7 @@ struct SessionDetailView: View {
                 Label("会議を要約", systemImage: "sparkles")
             }
             .buttonStyle(XTSecondaryButtonStyle())
-            .disabled(isSummarizingMeeting)
+            .disabled(isSummaryQueueBusy)
 
             Spacer()
 
@@ -255,6 +256,7 @@ struct SessionDetailView: View {
                         topic: nil,
                         index: nil,
                         utterances: unassigned,
+                        isSummaryQueueBusy: isSummaryQueueBusy,
                         onSummarizeTopic: onSummarizeTopic,
                         onTranscribeUtterance: onTranscribeUtterance
                     )
@@ -272,6 +274,7 @@ struct SessionDetailView: View {
                             topic: topic,
                             index: index + 1,
                             utterances: topicUtterances,
+                            isSummaryQueueBusy: isSummaryQueueBusy,
                             onSummarizeTopic: onSummarizeTopic,
                             onTranscribeUtterance: onTranscribeUtterance
                         )
@@ -411,6 +414,7 @@ private struct TopicCardView: View {
     let topic: Topic?
     let index: Int?
     let utterances: [UtteranceDetailSnapshot]
+    let isSummaryQueueBusy: Bool
     let onSummarizeTopic: (UUID) -> Void
     let onTranscribeUtterance: (UUID) -> Void
 
@@ -474,7 +478,7 @@ private struct TopicCardView: View {
                 Button("要約") { onSummarizeTopic(topic.id) }
                     .buttonStyle(XTSecondaryButtonStyle())
                     .controlSize(.small)
-                    .disabled(topic.summaryStatus == .running)
+                    .disabled(isSummaryQueueBusy || topic.summaryStatus == .running)
             }
         }
         .padding(.horizontal, XT.S.lg)

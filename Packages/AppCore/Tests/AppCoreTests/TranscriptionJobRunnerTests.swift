@@ -16,10 +16,18 @@ struct TranscriptionJobRunnerTests {
         let staleTranscriptURL = context.paths.transcripts.appending(path: "stale.txt")
         try "stale transcript".write(to: staleTranscriptURL, atomically: true, encoding: .utf8)
 
-        let result = try await context.runner.run(
+        let outcome = try await context.runner.run(
             utteranceID: context.utteranceID,
             recordingArtifact: context.recordingArtifact
         )
+        let result: TranscriptionJobRunResult
+        switch outcome {
+        case let .completed(completed):
+            result = completed
+        case .discarded:
+            Issue.record("Expected successful transcript to complete, but it was discarded.")
+            return
+        }
 
         let jobs = try context.store.listTranscriptionJobs(utteranceID: context.utteranceID)
         let artifacts = try context.store.listTranscriptArtifacts(utteranceID: context.utteranceID)
@@ -37,7 +45,7 @@ struct TranscriptionJobRunnerTests {
     }
 
     @Test
-    func failsJobWhenProcessSucceedsButTranscriptOutputIsMissing() async throws {
+    func discardsJobWhenProcessSucceedsButTranscriptOutputIsMissing() async throws {
         let context = try makeRunnerContext(
             behavior: .missingTranscript(
                 createdFileName: "sidecar.log",
@@ -46,22 +54,57 @@ struct TranscriptionJobRunnerTests {
             )
         )
 
-        do {
-            _ = try await context.runner.run(
-                utteranceID: context.utteranceID,
-                recordingArtifact: context.recordingArtifact
-            )
-            Issue.record("Expected missing transcript validation to fail.")
-        } catch {
-            let jobs = try context.store.listTranscriptionJobs(utteranceID: context.utteranceID)
-            let artifacts = try context.store.listTranscriptArtifacts(utteranceID: context.utteranceID)
+        let outcome = try await context.runner.run(
+            utteranceID: context.utteranceID,
+            recordingArtifact: context.recordingArtifact
+        )
+        let jobs = try context.store.listTranscriptionJobs(utteranceID: context.utteranceID)
+        let artifacts = try context.store.listTranscriptArtifacts(utteranceID: context.utteranceID)
 
-            #expect(jobs.count == 1)
-            #expect(jobs.first?.status == .failed)
-            #expect(jobs.first?.outputFileNames == ["sidecar.log"])
-            #expect(jobs.first?.failureMessage?.contains("no transcript text file") == true)
-            #expect(artifacts.isEmpty)
+        switch outcome {
+        case .completed:
+            Issue.record("Expected missing transcript to be discarded.")
+        case let .discarded(job, reason):
+            #expect(job.status == .discarded)
+            #expect(reason.contains("no transcript text file"))
         }
+
+        #expect(jobs.count == 1)
+        #expect(jobs.first?.status == .discarded)
+        #expect(jobs.first?.outputFileNames == ["sidecar.log"])
+        #expect(jobs.first?.failureMessage?.contains("no transcript text file") == true)
+        #expect(artifacts.isEmpty)
+    }
+
+    @Test
+    func discardsJobWhenTranscriptOutputIsEmpty() async throws {
+        let context = try makeRunnerContext(
+            behavior: .success(
+                transcriptFileName: "utterance.txt",
+                transcriptText: "   \n",
+                standardOutput: "ok",
+                standardError: nil
+            )
+        )
+
+        let outcome = try await context.runner.run(
+            utteranceID: context.utteranceID,
+            recordingArtifact: context.recordingArtifact
+        )
+        let jobs = try context.store.listTranscriptionJobs(utteranceID: context.utteranceID)
+        let artifacts = try context.store.listTranscriptArtifacts(utteranceID: context.utteranceID)
+
+        switch outcome {
+        case .completed:
+            Issue.record("Expected empty transcript to be discarded.")
+        case let .discarded(job, reason):
+            #expect(job.status == .discarded)
+            #expect(reason.contains("empty"))
+        }
+
+        #expect(jobs.count == 1)
+        #expect(jobs.first?.status == .discarded)
+        #expect(artifacts.isEmpty)
     }
 
     @Test

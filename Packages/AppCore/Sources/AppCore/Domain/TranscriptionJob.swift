@@ -5,6 +5,7 @@ public struct TranscriptionJob: Identifiable, Equatable, Sendable {
         case queued
         case running
         case completed
+        case discarded
         case failed
     }
 
@@ -132,6 +133,35 @@ public struct TranscriptionJob: Identifiable, Equatable, Sendable {
             modelIdentifier: modelIdentifier,
             language: language,
             status: .failed,
+            createdAt: createdAt,
+            startedAt: startedAt,
+            endedAt: endedAt,
+            stdoutFilePath: stdoutFilePath,
+            stderrFilePath: stderrFilePath,
+            exitCode: exitCode,
+            outputFileNames: outputFileNames,
+            failureMessage: message
+        )
+    }
+
+    public func discarded(
+        at endedAt: Date,
+        stdoutFilePath: String?,
+        stderrFilePath: String?,
+        exitCode: Int32?,
+        outputFileNames: [String],
+        message: String
+    ) -> TranscriptionJob {
+        TranscriptionJob(
+            id: id,
+            utteranceID: utteranceID,
+            recordingArtifactID: recordingArtifactID,
+            workingDirectoryPath: workingDirectoryPath,
+            command: command,
+            arguments: arguments,
+            modelIdentifier: modelIdentifier,
+            language: language,
+            status: .discarded,
             createdAt: createdAt,
             startedAt: startedAt,
             endedAt: endedAt,

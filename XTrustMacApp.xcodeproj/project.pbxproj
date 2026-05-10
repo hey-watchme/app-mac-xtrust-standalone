@@ -7,9 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1AC8780F48A0B10DF35C0647 /* MLXSummarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3244AF913524D3AE9012DE /* MLXSummarizer.swift */; };
 		1FA48225782CC8ABBA9C452C /* AudioPlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA322B047B4588EAC739AAC5 /* AudioPlaybackController.swift */; };
 		3A3FF778EAB67D5BB2F2BAF9 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 543D897CB093CF85ACFB0C15 /* AppState.swift */; };
 		42154AEA24A9331017A0E85E /* MicrophoneRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC877D5F1F438AFC5A5F45AC /* MicrophoneRecorder.swift */; };
+		5092AB5E55FC98CC3405D0C0 /* XTrustTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E584EAA8B416D632F343D32B /* XTrustTheme.swift */; };
 		55F615E295737644A740FAC8 /* XTrustMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A49548DD7BC0427330E618 /* XTrustMacApp.swift */; };
 		67930E7B9AA67AC250C7ED7E /* AppDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A262A19F49CB88682E84D0E /* AppDiagnostics.swift */; };
 		79B9BA207CF3562ABB74B287 /* SessionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BFEC83FD81FE76DA1667151 /* SessionListView.swift */; };
@@ -20,16 +22,18 @@
 		B187579E2D50942C02920D13 /* SessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A039DEEAD8BA719205DF34E6 /* SessionDetailView.swift */; };
 		C50C6FD5BB908566CD52FB47 /* AppRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE57E48760C5E12FE75244C1 /* AppRuntime.swift */; };
 		CF8906C4E9E105CE115CA3A5 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3556079B74CE405811406122 /* AppDelegate.swift */; };
+		D585210E1A56F1D8F2D65251 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9255492013B17F4F6AE6E059 /* SettingsView.swift */; };
+		E4BE1A768D2401C4D0077214 /* logo_xtrust_black.svg in Resources */ = {isa = PBXBuildFile; fileRef = 19EAA66F29F08A3D78813E77 /* logo_xtrust_black.svg */; };
 		EBCDFF256F40B9D72F47E2F6 /* WhisperTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6432B9AEAE14BE6F8FDE43A8 /* WhisperTranscriber.swift */; };
-		A1B2C3D4E5F6A7B8C9D0E1F2 /* MLXSummarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* MLXSummarizer.swift */; };
-		A9B0C1D2E3F4A5B6C7D8E9FA /* XTrustTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F7A8B9C0D1E2 /* XTrustTheme.swift */; };
-		D2E3F4A5B6C7D8E9F0A1B2C3 /* XTrustComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F4A5B6C7D8E9F0A1B2 /* XTrustComponents.swift */; };
+		F2A2A15236B9362FDF4CDACE /* XTrustComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7CAE61CA8D4E50413A3EDF7 /* XTrustComponents.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0B8203599318178CFC0FE23E /* AppCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AppCore; path = Packages/AppCore; sourceTree = SOURCE_ROOT; };
 		0BD655090BEE7DF2EB7611B1 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
+		19EAA66F29F08A3D78813E77 /* logo_xtrust_black.svg */ = {isa = PBXFileReference; path = logo_xtrust_black.svg; sourceTree = "<group>"; };
 		1B717838272D4016CA9091B5 /* CopyableDetailRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyableDetailRow.swift; sourceTree = "<group>"; };
+		2B3244AF913524D3AE9012DE /* MLXSummarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLXSummarizer.swift; sourceTree = "<group>"; };
 		3556079B74CE405811406122 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		3BFEC83FD81FE76DA1667151 /* SessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListView.swift; sourceTree = "<group>"; };
 		43DB9155B0668067122FED0D /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
@@ -37,17 +41,17 @@
 		543D897CB093CF85ACFB0C15 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		6432B9AEAE14BE6F8FDE43A8 /* WhisperTranscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperTranscriber.swift; sourceTree = "<group>"; };
 		89A49548DD7BC0427330E618 /* XTrustMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XTrustMacApp.swift; sourceTree = "<group>"; };
+		9255492013B17F4F6AE6E059 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		9A262A19F49CB88682E84D0E /* AppDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiagnostics.swift; sourceTree = "<group>"; };
 		A039DEEAD8BA719205DF34E6 /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
 		AA322B047B4588EAC739AAC5 /* AudioPlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaybackController.swift; sourceTree = "<group>"; };
+		B7CAE61CA8D4E50413A3EDF7 /* XTrustComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XTrustComponents.swift; sourceTree = "<group>"; };
 		BD590FC1C81A0DA1FA3DCB16 /* AVAudioCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVAudioCaptureController.swift; sourceTree = "<group>"; };
 		C87E0546F37CE687A12C03E5 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
 		CE57E48760C5E12FE75244C1 /* AppRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntime.swift; sourceTree = "<group>"; };
 		D3211A8FB80887592033D556 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
-		B2C3D4E5F6A7B8C9D0E1F2A3 /* MLXSummarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLXSummarizer.swift; sourceTree = "<group>"; };
+		E584EAA8B416D632F343D32B /* XTrustTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XTrustTheme.swift; sourceTree = "<group>"; };
 		EC877D5F1F438AFC5A5F45AC /* MicrophoneRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneRecorder.swift; sourceTree = "<group>"; };
-		F1A2B3C4D5E6F7A8B9C0D1E2 /* XTrustTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XTrustTheme.swift; sourceTree = "<group>"; };
-		C1D2E3F4A5B6C7D8E9F0A1B2 /* XTrustComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XTrustComponents.swift; sourceTree = "<group>"; };
 		ED547DCBCF6CC917E2B8427E /* XTrustMacApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XTrustMacApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -79,6 +83,7 @@
 			isa = PBXGroup;
 			children = (
 				D3211A8FB80887592033D556 /* .gitkeep */,
+				19EAA66F29F08A3D78813E77 /* logo_xtrust_black.svg */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -98,6 +103,14 @@
 				3BFEC83FD81FE76DA1667151 /* SessionListView.swift */,
 			);
 			path = Sessions;
+			sourceTree = "<group>";
+		};
+		802EA95E83A195DB47680E13 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				9255492013B17F4F6AE6E059 /* SettingsView.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 		B048EF2420E08954A1243A46 = {
@@ -137,11 +150,11 @@
 				BD590FC1C81A0DA1FA3DCB16 /* AVAudioCaptureController.swift */,
 				1B717838272D4016CA9091B5 /* CopyableDetailRow.swift */,
 				C87E0546F37CE687A12C03E5 /* DiagnosticsView.swift */,
-				B2C3D4E5F6A7B8C9D0E1F2A3 /* MLXSummarizer.swift */,
 				EC877D5F1F438AFC5A5F45AC /* MicrophoneRecorder.swift */,
+				2B3244AF913524D3AE9012DE /* MLXSummarizer.swift */,
 				6432B9AEAE14BE6F8FDE43A8 /* WhisperTranscriber.swift */,
-				F1A2B3C4D5E6F7A8B9C0D1E2 /* XTrustTheme.swift */,
-				C1D2E3F4A5B6C7D8E9F0A1B2 /* XTrustComponents.swift */,
+				B7CAE61CA8D4E50413A3EDF7 /* XTrustComponents.swift */,
+				E584EAA8B416D632F343D32B /* XTrustTheme.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -151,6 +164,7 @@
 			children = (
 				43DB9155B0668067122FED0D /* .gitkeep */,
 				732B56C6EDD12B5CA3380717 /* Sessions */,
+				802EA95E83A195DB47680E13 /* Settings */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -163,6 +177,7 @@
 			buildConfigurationList = 9DFC03CCB324CFFC1AE0CD60 /* Build configuration list for PBXNativeTarget "XTrustMacApp" */;
 			buildPhases = (
 				76DB1644CCE01EC2031007A1 /* Sources */,
+				A2E6CDD85D7E12A0028C8AAC /* Resources */,
 				9DBF4A6915DCE9A745EC970B /* Frameworks */,
 			);
 			buildRules = (
@@ -214,6 +229,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		A2E6CDD85D7E12A0028C8AAC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E4BE1A768D2401C4D0077214 /* logo_xtrust_black.svg in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		76DB1644CCE01EC2031007A1 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -227,14 +253,15 @@
 				1FA48225782CC8ABBA9C452C /* AudioPlaybackController.swift in Sources */,
 				A3F17FB9D470216B2E545CA9 /* CopyableDetailRow.swift in Sources */,
 				91A9FABEC61732FA26E32687 /* DiagnosticsView.swift in Sources */,
+				1AC8780F48A0B10DF35C0647 /* MLXSummarizer.swift in Sources */,
 				42154AEA24A9331017A0E85E /* MicrophoneRecorder.swift in Sources */,
 				B187579E2D50942C02920D13 /* SessionDetailView.swift in Sources */,
 				79B9BA207CF3562ABB74B287 /* SessionListView.swift in Sources */,
+				D585210E1A56F1D8F2D65251 /* SettingsView.swift in Sources */,
 				EBCDFF256F40B9D72F47E2F6 /* WhisperTranscriber.swift in Sources */,
-				A1B2C3D4E5F6A7B8C9D0E1F2 /* MLXSummarizer.swift in Sources */,
+				F2A2A15236B9362FDF4CDACE /* XTrustComponents.swift in Sources */,
 				55F615E295737644A740FAC8 /* XTrustMacApp.swift in Sources */,
-				A9B0C1D2E3F4A5B6C7D8E9FA /* XTrustTheme.swift in Sources */,
-				D2E3F4A5B6C7D8E9F0A1B2C3 /* XTrustComponents.swift in Sources */,
+				5092AB5E55FC98CC3405D0C0 /* XTrustTheme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

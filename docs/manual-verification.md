@@ -1,6 +1,6 @@
 # Manual Verification Checklist
 
-Date: 2026-05-08 JST
+Date: 2026-05-10 JST
 
 ## Purpose
 
@@ -16,6 +16,86 @@ fails, the failure points to a broken contract boundary — not to a UI bug.
   `~/Library/Application Support/XTrust/com.xtrust.mac-local-first/models/whisper/small.pt`
 - App built and running from Xcode with `Signing Certificate: Development`
 - All workspace paths visible in Diagnostics screen
+
+## Shared-device checks
+
+Before running the legacy capture checks below, confirm the new room-device
+baseline.
+
+### Check 0 — Locked start state
+
+Goal: confirm the app launches into a neutral shared-device screen when no
+access session is active.
+
+Steps:
+
+1. Launch the app.
+2. Confirm the first screen is the locked room-device screen.
+3. Confirm it shows:
+   - organization
+   - workspace
+   - device
+4. Confirm no prior session list is visible before access begins.
+
+Pass: the app starts locked and no prior meeting contents are casually visible.
+
+### Check 1 — Begin local access and inspect settings
+
+Goal: confirm local mock access opens the shared-device UI and the settings
+screen shows current scope metadata.
+
+Steps:
+
+1. From the locked screen, press `利用を開始`.
+2. Confirm the session UI becomes visible.
+3. In the left sidebar footer, press `Settings`.
+4. Confirm the settings screen shows:
+   - organization
+   - workspace
+   - workspace code
+   - device
+   - device location
+   - bootstrap account
+   - active access
+   - access status
+
+Pass: access begins successfully and settings reflect the current shared-device
+scope.
+
+### Check 2 — Logout resets the shared UI
+
+Goal: confirm leaving access returns the app to a neutral shared-device state.
+
+Steps:
+
+1. While access is active, create one session if needed.
+2. Press `退出` in the sidebar header.
+3. Confirm the app returns to the locked room-device screen.
+4. Confirm the prior visible session list is no longer shown.
+
+Pass: logout resets the shared UI and returns to the locked screen.
+
+### Check 2.5 — Stuck summary recovery is self-service
+
+Goal: confirm stale running summaries do not require DB edits or developer
+intervention.
+
+Steps:
+
+1. Press `利用を開始` if the app is locked. Create a session with at least one
+   summarizable topic.
+2. Start one topic summary.
+3. Force-quit the app while the summary is still shown as running.
+4. Relaunch the app.
+5. Press `利用を開始` if needed and open `Settings`.
+6. Confirm either:
+   - a maintenance message says stale summaries were recovered on startup
+   - or `Recovered Stale Summaries` is incremented in diagnostics
+7. If a stuck summary still appears, press `Reset Stuck Summaries`.
+8. Confirm the topic no longer remains in `running` state forever.
+
+Pass: stale summary state is cleared by the product itself, not by manual DB
+intervention.
 
 ## Workspace root
 
@@ -34,14 +114,14 @@ fails, the failure points to a broken contract boundary — not to a UI bug.
 
 ---
 
-## Check 1 — Basic flow
+## Check 3 — Basic flow
 
 Goal: confirm that one full recording → transcription cycle produces the
 expected artifacts on disk and shows correct state in the UI.
 
 Steps:
 
-1. Launch the app. Create a new session.
+1. Launch the app. Press `利用を開始` if the app is locked. Create a new session.
 2. Press `Start Recording`. Speak a few words in Japanese. Press `Stop Recording`.
 3. Confirm in Session Detail:
    - `Status: completed`
@@ -67,16 +147,21 @@ Steps:
 
 Pass: all artifact paths exist on disk and all UI fields match.
 
+Additional ASR expectation:
+
+- non-speech noises such as claps, coughs, or silence-adjacent triggers should
+  not leave a persistent red `文字起こし失敗` row after processing completes
+
 ---
 
-## Check 2 — Restart persistence
+## Check 4 — Restart persistence
 
 Goal: confirm that job state and transcript artifacts survive app quit and
 relaunch without data loss.
 
 Steps:
 
-1. Complete Check 1 so that one completed transcription job exists.
+1. Complete Check 3 so that one completed transcription job exists.
 2. Note the following values from Session Detail:
    - Session ID
    - Job ID from Job Attempts
@@ -97,14 +182,14 @@ to idle.
 
 ---
 
-## Check 3 — Retry creates a new job
+## Check 5 — Retry creates a new job
 
 Goal: confirm that retrying transcription creates a new job with a new ID and
 does not overwrite or remove the previous job's evidence.
 
 Steps:
 
-1. Complete Check 1 so that one completed transcription job exists.
+1. Complete Check 3 so that one completed transcription job exists.
 2. Note:
    - Job ID of the first attempt (Attempt 1)
    - Transcript ID of the first attempt
@@ -127,7 +212,7 @@ The first job's evidence is intact.
 
 ---
 
-## Check 4 — Failure diagnostics
+## Check 6 — Failure diagnostics
 
 Goal: confirm that a failed transcription job retains its stderr and failure
 message, and that this evidence is visible in the UI and on disk.
@@ -139,7 +224,7 @@ Steps:
    mv ~/Library/Application\ Support/XTrust/com.xtrust.mac-local-first/models/whisper/small.pt \
       ~/Library/Application\ Support/XTrust/com.xtrust.mac-local-first/models/whisper/small.pt.bak
    ```
-2. Create a new session. Record a short wav. Stop recording.
+2. Press `利用を開始` if the app is locked. Create a new session. Record a short wav. Stop recording.
 3. Press `Transcribe Recording`.
 4. Wait for failure.
 5. Confirm in Session Detail:
@@ -166,14 +251,14 @@ works after model is restored.
 
 ---
 
-## Check 5 — Attempt-level transcript artifact linkage
+## Check 7 — Attempt-level transcript artifact linkage
 
 Goal: confirm that after multiple attempts, each attempt in Job Attempts shows
 only its own transcript artifact — not a shared or latest-only artifact.
 
 Steps:
 
-1. Complete Check 3 so that two successful attempts exist.
+1. Complete Check 5 so that two successful attempts exist.
 2. In Job Attempts, open Attempt 1 and note its `Transcript ID`.
 3. Open Attempt 2 and note its `Transcript ID`.
 4. Confirm the two Transcript IDs are different.
@@ -201,7 +286,7 @@ attempt borrows another attempt's artifact.
 
 ## After all checks pass
 
-All five checks passing means:
+All seven checks passing means:
 
 - the persisted job pipeline is stable enough to proceed
 - failure evidence is durable and diagnosable from the UI

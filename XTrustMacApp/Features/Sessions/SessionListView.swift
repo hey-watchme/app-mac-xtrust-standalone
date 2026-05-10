@@ -7,54 +7,72 @@ struct SessionListView: View {
     @ObservedObject var appState: AppState
 
     var body: some View {
-        NavigationSplitView {
-            SidebarView(
-                sessions: appState.sessions,
-                selectedSessionID: Binding(
-                    get: { appState.selectedSessionID },
-                    set: { appState.selectSession($0) }
-                ),
-                onNewSession: { appState.createSession() }
-            )
-            .navigationSplitViewColumnWidth(
-                min: 200, ideal: XT.Layout.sidebarWidth, max: 320
-            )
-        } detail: {
-            SessionDetailView(
-                detail: appState.selectedSessionDetail,
-                isListening: appState.isListening,
-                isSpeechActive: appState.isSpeechActive,
-                audioLevel: appState.audioLevel,
-                diagnostics: appState.diagnostics,
-                sessionCount: appState.sessions.count,
-                errorMessage: appState.errorMessage,
-                onStartListening: {
-                    Task { await appState.startListening() }
-                },
-                onStopListening: { appState.stopListening() },
-                onTranscribeUtterance: { id in
-                    Task { await appState.transcribeUtterance(utteranceID: id) }
-                },
-                onSummarizeTopic: { id in
-                    Task { await appState.summarizeTopic(topicID: id) }
-                },
-                onSetSessionStatus: { appState.setSessionStatus($0) },
-                onSetMeetingContextProfile: { appState.setMeetingContextProfile($0) },
-                onSummarizeMeeting: {
-                    Task { await appState.summarizeMeeting() }
-                },
-                onCopyWrapUp: {
-                    guard let detail = appState.selectedSessionDetail else { return }
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(
-                        appState.wrapUpText(for: detail), forType: .string
+        Group {
+            if appState.activeAccessSession == nil {
+                LockedDeviceView(appState: appState)
+            } else {
+                NavigationSplitView {
+                    SidebarView(
+                        sessions: appState.sessions,
+                        selectedSessionID: Binding(
+                            get: { appState.selectedSessionID },
+                            set: { appState.selectSession($0) }
+                        ),
+                        isShowingSettings: appState.isShowingSettings,
+                        activeAccountName: appState.activeAccessAccountDisplayName,
+                        onNewSession: { appState.createSession() },
+                        onShowSettings: { appState.showSettings() },
+                        onLogout: { appState.logoutActiveAccess() }
                     )
-                },
-                meetingSummaryText: appState.meetingSummaryText,
-                isSummarizingMeeting: appState.isSummarizingMeeting
-            )
+                    .navigationSplitViewColumnWidth(
+                        min: 200, ideal: XT.Layout.sidebarWidth, max: 320
+                    )
+                } detail: {
+                    if appState.isShowingSettings {
+                        SettingsView(
+                            diagnostics: appState.diagnostics,
+                            sessionCount: appState.sessions.count,
+                            errorMessage: appState.errorMessage,
+                            maintenanceMessage: appState.maintenanceMessage,
+                            isSummaryQueueBusy: appState.isSummaryQueueBusy,
+                            onRecoverStaleSummaries: { appState.recoverStaleSummaries() }
+                        )
+                    } else {
+                        SessionDetailView(
+                            detail: appState.selectedSessionDetail,
+                            isListening: appState.isListening,
+                            isSpeechActive: appState.isSpeechActive,
+                            audioLevel: appState.audioLevel,
+                            diagnostics: appState.diagnostics,
+                            sessionCount: appState.sessions.count,
+                            errorMessage: appState.errorMessage,
+                            onStartListening: {
+                                Task { await appState.startListening() }
+                            },
+                            onStopListening: { appState.stopListening() },
+                            onTranscribeUtterance: { id in
+                                Task { await appState.transcribeUtterance(utteranceID: id) }
+                            },
+                            onSummarizeTopic: { id in appState.requestTopicSummary(topicID: id) },
+                            onSetSessionStatus: { appState.setSessionStatus($0) },
+                            onSetMeetingContextProfile: { appState.setMeetingContextProfile($0) },
+                            onSummarizeMeeting: { appState.requestMeetingSummary() },
+                            onCopyWrapUp: {
+                                guard let detail = appState.selectedSessionDetail else { return }
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(
+                                    appState.wrapUpText(for: detail), forType: .string
+                                )
+                            },
+                            meetingSummaryText: appState.meetingSummaryText,
+                            isSummarizingMeeting: appState.isSummarizingMeeting,
+                            isSummaryQueueBusy: appState.isSummaryQueueBusy
+                        )
+                    }
+                }
+                .navigationSplitViewStyle(.balanced)
+            }
         }
-        .navigationSplitViewStyle(.balanced)
     }
 }
 
@@ -63,7 +81,11 @@ struct SessionListView: View {
 private struct SidebarView: View {
     let sessions: [Session]
     @Binding var selectedSessionID: Session.ID?
+    let isShowingSettings: Bool
+    let activeAccountName: String?
     let onNewSession: () -> Void
+    let onShowSettings: () -> Void
+    let onLogout: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -83,19 +105,32 @@ private struct SidebarView: View {
             Divider()
                 .padding(.horizontal, XT.S.md)
 
-            newSessionButton
+            footerMenu
         }
     }
 
     // MARK: Header
 
     private var sidebarHeader: some View {
-        HStack {
-            XTrustLogoView()
-            Spacer()
+        VStack(spacing: XT.S.xs) {
+            HStack {
+                XTrustLogoView()
+                Spacer()
+                Button(action: onLogout) {
+                    Label("退出", systemImage: "rectangle.portrait.and.arrow.right")
+                }
+                .buttonStyle(XTSecondaryButtonStyle())
+            }
+
+            HStack {
+                Text(activeAccountName.map { "使用中: \($0)" } ?? "使用中")
+                    .font(XT.F.caption)
+                    .foregroundStyle(XT.C.textSecondary)
+                Spacer()
+            }
         }
         .padding(.horizontal, XT.S.lg)
-        .frame(height: 52)
+        .padding(.vertical, XT.S.md)
     }
 
     // MARK: Session List
@@ -136,24 +171,133 @@ private struct SidebarView: View {
         .padding(.vertical, XT.S.xxxl)
     }
 
-    // MARK: New Session Button
+    // MARK: Footer
+
+    private var footerMenu: some View {
+        VStack(spacing: 0) {
+            newSessionButton
+            settingsButton
+        }
+    }
 
     private var newSessionButton: some View {
-        Button(action: onNewSession) {
+        sidebarFooterButton(
+            title: "新規セッション",
+            systemImage: "plus.circle.fill",
+            isSelected: false,
+            action: onNewSession
+        )
+    }
+
+    private var settingsButton: some View {
+        sidebarFooterButton(
+            title: "Settings",
+            systemImage: "gearshape",
+            isSelected: isShowingSettings,
+            action: onShowSettings
+        )
+    }
+
+    private func sidebarFooterButton(
+        title: String,
+        systemImage: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
             HStack(spacing: XT.S.sm) {
-                Image(systemName: "plus.circle.fill")
+                Image(systemName: systemImage)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(XT.C.accent)
-                Text("新規セッション")
+                    .foregroundStyle(isSelected ? XT.C.textPrimary : XT.C.accent)
+                Text(title)
                     .font(XT.F.sidebarItem)
                     .foregroundStyle(XT.C.textPrimary)
                 Spacer()
             }
             .padding(.horizontal, XT.S.lg)
             .frame(height: 48)
+            .background(
+                RoundedRectangle(cornerRadius: XT.R.sm)
+                    .fill(isSelected ? XT.C.selectedBG : Color.clear)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Locked Device
+
+private struct LockedDeviceView: View {
+    @ObservedObject var appState: AppState
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    XT.C.windowBG,
+                    XT.C.cardBG.opacity(0.94)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: XT.S.xl) {
+                XTCard {
+                    VStack(alignment: .leading, spacing: XT.S.lg) {
+                        VStack(alignment: .leading, spacing: XT.S.sm) {
+                            XTrustLogoView()
+                            Text("共有会議デバイス")
+                                .font(XT.F.displayTitle)
+                                .foregroundStyle(XT.C.textPrimary)
+                            Text("利用開始すると、この場の会議だけを処理します。終了後は共有画面をリセットします。")
+                                .font(XT.F.body)
+                                .foregroundStyle(XT.C.textSecondary)
+                        }
+
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: XT.S.sm) {
+                            CopyableDetailRow(
+                                title: "Organization",
+                                value: appState.sharedDeviceContext.organization.name
+                            )
+                            CopyableDetailRow(
+                                title: "Workspace",
+                                value: appState.sharedDeviceContext.workspace.name
+                            )
+                            CopyableDetailRow(
+                                title: "Device",
+                                value: appState.sharedDeviceContext.device.displayName
+                            )
+                            if let location = appState.sharedDeviceContext.device.locationLabel {
+                                CopyableDetailRow(title: "Location", value: location)
+                            }
+                        }
+
+                        HStack {
+                            Button(action: { appState.beginLocalAccess() }) {
+                                Label("利用を開始", systemImage: "person.crop.circle.badge.checkmark")
+                            }
+                            .buttonStyle(XTPrimaryButtonStyle())
+
+                            Spacer()
+                        }
+
+                        if let errorMessage = appState.errorMessage {
+                            Text(errorMessage)
+                                .font(XT.F.caption)
+                                .foregroundStyle(XT.C.destructive)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    .padding(XT.S.xl)
+                }
+                .frame(maxWidth: 640)
+            }
+            .padding(XT.S.xxxl)
+        }
     }
 }
 

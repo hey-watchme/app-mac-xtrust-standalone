@@ -1,5 +1,6 @@
 import AppCore
 import AVFoundation
+import Darwin
 import Foundation
 
 final class AVAudioCaptureController: CaptureController, @unchecked Sendable {
@@ -18,6 +19,8 @@ final class AVAudioCaptureController: CaptureController, @unchecked Sendable {
     private var speechStartTime: Date?
     private var utteranceFile: AVAudioFile?
     private var utteranceFileURL: URL?
+    private var pendingSilenceBuffers: [AVAudioPCMBuffer] = []
+    private var pendingSilenceFrameCount: Int = 0
 
     private let speechRMSThreshold: Float = 0.01
     private let silenceThresholdSeconds: Double = 3.0
@@ -45,6 +48,8 @@ final class AVAudioCaptureController: CaptureController, @unchecked Sendable {
         self.silenceThresholdFrames = Int(silenceThresholdSeconds * targetFormat.sampleRate)
         self.speechActive = false
         self.silenceFrameCount = 0
+        self.pendingSilenceBuffers = []
+        self.pendingSilenceFrameCount = 0
 
         guard let converter = AVAudioConverter(from: hardwareFormat, to: targetFormat) else {
             throw AVAudioCaptureError.converterCreationFailed
@@ -74,6 +79,8 @@ final class AVAudioCaptureController: CaptureController, @unchecked Sendable {
         speechStartTime = nil
         speechActive = false
         silenceFrameCount = 0
+        pendingSilenceBuffers = []
+        pendingSilenceFrameCount = 0
         onEventCallback = nil
         utteranceOutputDirectory = nil
     }
@@ -98,10 +105,11 @@ final class AVAudioCaptureController: CaptureController, @unchecked Sendable {
                 beginNewUtteranceFile()
                 onEventCallback?(.speechStarted)
             }
+            flushPendingSilenceToCurrentFile()
             writeToCurrentFile(convertedBuffer)
         } else {
             if speechActive {
-                writeToCurrentFile(convertedBuffer)
+                bufferPendingSilence(convertedBuffer)
                 silenceFrameCount += Int(convertedBuffer.frameLength)
                 if silenceFrameCount >= silenceThresholdFrames {
                     finalizeCurrentUtterance()
@@ -188,15 +196,56 @@ final class AVAudioCaptureController: CaptureController, @unchecked Sendable {
         try? utteranceFile?.write(from: buffer)
     }
 
+    private func bufferPendingSilence(_ buffer: AVAudioPCMBuffer) {
+        guard let copiedBuffer = copyBuffer(buffer) else { return }
+        pendingSilenceBuffers.append(copiedBuffer)
+        pendingSilenceFrameCount += Int(copiedBuffer.frameLength)
+    }
+
+    private func flushPendingSilenceToCurrentFile() {
+        guard !pendingSilenceBuffers.isEmpty else { return }
+        for buffer in pendingSilenceBuffers {
+            writeToCurrentFile(buffer)
+        }
+        pendingSilenceBuffers.removeAll(keepingCapacity: true)
+        pendingSilenceFrameCount = 0
+    }
+
+    private func clearPendingSilence() {
+        pendingSilenceBuffers.removeAll(keepingCapacity: true)
+        pendingSilenceFrameCount = 0
+    }
+
+    private func copyBuffer(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+        guard let format = targetFormat,
+              let sourceChannelData = buffer.int16ChannelData,
+              let copiedBuffer = AVAudioPCMBuffer(
+                pcmFormat: format,
+                frameCapacity: buffer.frameLength
+              ),
+              let destinationChannelData = copiedBuffer.int16ChannelData else {
+            return nil
+        }
+
+        copiedBuffer.frameLength = buffer.frameLength
+        let byteCount = Int(buffer.frameLength) * MemoryLayout<Int16>.stride
+        memcpy(destinationChannelData[0], sourceChannelData[0], byteCount)
+        return copiedBuffer
+    }
+
     private func finalizeCurrentUtterance() {
         guard let startTime = speechStartTime, let fileURL = utteranceFileURL else { return }
-        let endedAt = Date()
+        let trailingSilenceDuration = targetFormat.map {
+            Double(pendingSilenceFrameCount) / $0.sampleRate
+        } ?? 0
+        let endedAt = Date().addingTimeInterval(-trailingSilenceDuration)
         let durationSeconds = endedAt.timeIntervalSince(startTime)
 
         // Release AVAudioFile to flush and close the file before firing the event.
         utteranceFile = nil
         utteranceFileURL = nil
         speechStartTime = nil
+        clearPendingSilence()
 
         onEventCallback?(.utteranceFinalized(
             audioFileURL: fileURL,

@@ -1,6 +1,6 @@
 # Mac Local-First Testing Strategy
 
-Date: 2026-05-08 JST
+Date: 2026-05-10 JST
 
 ## Objective
 
@@ -35,6 +35,7 @@ Required examples:
 - utterance cannot enter `transcribing` without a finalized audio artifact
 - failed transcription does not change session status
 - retry creates a new job attempt
+- access session begins as `active` and ends as `logged_out` or `timed_out`
 
 ### Layer 2: Filesystem artifact tests
 
@@ -55,6 +56,8 @@ Required examples:
 
 Use for:
 
+- organizations, workspaces, devices, accounts, memberships
+- access sessions
 - sessions, topics, utterances
 - recording artifacts
 - transcription jobs
@@ -63,9 +66,13 @@ Use for:
 
 Required examples:
 
+- one organization owns many workspaces
+- one workspace owns many devices
+- one device can have many access sessions
 - one session owns many utterances
 - one utterance can have multiple transcription attempts
 - failed job evidence survives store reload
+- stale `running` summary state is recovered on restart without DB intervention
 
 ### Layer 4: Fake sidecar tests
 
@@ -81,6 +88,20 @@ Required examples:
 - fake transcriber produces exactly one txt file and succeeds
 - fake transcriber exits 0 but produces no txt file and fails validation
 - fake transcriber exits nonzero and preserves stderr
+
+### Layer 4.5: Summary runtime safety tests
+
+Use for:
+
+- serialized local summarization
+- stale running-state recovery
+- admission control before MLX launch
+
+Required examples:
+
+- two concurrent summary requests execute with max concurrency `1`
+- interrupted `running` topic summaries are downgraded on restart
+- prompt-too-large and low-memory starts fail before subprocess launch
 
 ### Layer 5: Real fixture sidecar tests
 
@@ -134,6 +155,8 @@ Do not start with a large corpus.
 ### Domain and persistence
 
 - `Session`, `Topic`, `Utterance` unit tests
+- `Organization`, `Workspace`, `Device`, `Account`, `OrganizationMembership`,
+  and `AccessSession` store tests
 - transcription job lifecycle unit tests
 - SQLite CRUD tests for all domain and job tables
 
@@ -154,7 +177,13 @@ Do not start with a large corpus.
 ### UI wiring
 
 - launch app
+- confirm locked shared-device start screen
+- begin local access with the mock access path
 - create/select session
+- open `Settings`
+- confirm organization / workspace / device / access details are visible
+- confirm `Reset Stuck Summaries` is visible and disabled while a summary is
+  actively queued
 - show utterance list
 - show transcription job state
 - retry failed job from persisted state

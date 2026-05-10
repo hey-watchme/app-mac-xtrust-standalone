@@ -67,4 +67,36 @@ struct TranscriptionJobTests {
         #expect(failed.stderrFilePath == "/tmp/jobs/502/stderr.txt")
         #expect(failed.failureMessage == "txt output was not produced")
     }
+
+    @Test
+    func transitionsToDiscardedWithDiagnostics() {
+        let createdAt = Date(timeIntervalSince1970: 1_700_003_000)
+        let startedAt = Date(timeIntervalSince1970: 1_700_003_003)
+        let endedAt = Date(timeIntervalSince1970: 1_700_003_010)
+        let job = TranscriptionJob(
+            utteranceID: UUID(uuidString: "00000000-0000-0000-0000-000000000506")!,
+            recordingArtifactID: UUID(uuidString: "00000000-0000-0000-0000-000000000507")!,
+            workingDirectoryPath: "/tmp/jobs/503",
+            command: "whisper",
+            arguments: ["input.wav"],
+            modelIdentifier: "small",
+            language: "ja",
+            createdAt: createdAt
+        )
+
+        let discarded = job
+            .started(at: startedAt)
+            .discarded(
+                at: endedAt,
+                stdoutFilePath: "/tmp/jobs/503/stdout.txt",
+                stderrFilePath: "/tmp/jobs/503/stderr.txt",
+                exitCode: 0,
+                outputFileNames: [],
+                message: "Transcript file was empty after validation."
+            )
+
+        #expect(discarded.status == .discarded)
+        #expect(discarded.stderrFilePath == "/tmp/jobs/503/stderr.txt")
+        #expect(discarded.failureMessage == "Transcript file was empty after validation.")
+    }
 }

@@ -6,6 +6,11 @@ public struct WhisperCLITranscriberConfiguration: Sendable {
     public let modelName: String
     public let language: String
     public let modelDirectory: String
+    public let temperature: Double
+    public let noSpeechThreshold: Double
+    public let logprobThreshold: Double
+    public let compressionRatioThreshold: Double
+    public let conditionOnPreviousText: Bool
 
     public var expectedModelFilePath: String {
         URL(fileURLWithPath: modelDirectory, isDirectory: true)
@@ -17,12 +22,22 @@ public struct WhisperCLITranscriberConfiguration: Sendable {
         executablePath: String,
         modelName: String,
         language: String,
-        modelDirectory: String
+        modelDirectory: String,
+        temperature: Double = 0,
+        noSpeechThreshold: Double = 0.6,
+        logprobThreshold: Double = -1.0,
+        compressionRatioThreshold: Double = 2.4,
+        conditionOnPreviousText: Bool = false
     ) {
         self.executablePath = executablePath
         self.modelName = modelName
         self.language = language
         self.modelDirectory = modelDirectory
+        self.temperature = temperature
+        self.noSpeechThreshold = noSpeechThreshold
+        self.logprobThreshold = logprobThreshold
+        self.compressionRatioThreshold = compressionRatioThreshold
+        self.conditionOnPreviousText = conditionOnPreviousText
     }
 
     public static func developmentDefault(modelsRootDirectory: String) -> WhisperCLITranscriberConfiguration {
@@ -40,7 +55,12 @@ public struct WhisperCLITranscriberConfiguration: Sendable {
             language: "ja",
             modelDirectory: URL(fileURLWithPath: modelsRootDirectory, isDirectory: true)
                 .appending(path: "whisper", directoryHint: .isDirectory)
-                .path(percentEncoded: false)
+                .path(percentEncoded: false),
+            temperature: 0,
+            noSpeechThreshold: 0.6,
+            logprobThreshold: -1.0,
+            compressionRatioThreshold: 2.4,
+            conditionOnPreviousText: false
         )
     }
 }
@@ -82,6 +102,11 @@ public struct WhisperCLITranscriber: Transcriber, Sendable {
                 "--device", "cpu",
                 "--task", "transcribe",
                 "--language", configuration.language,
+                "--temperature", String(configuration.temperature),
+                "--no_speech_threshold", String(configuration.noSpeechThreshold),
+                "--logprob_threshold", String(configuration.logprobThreshold),
+                "--compression_ratio_threshold", String(configuration.compressionRatioThreshold),
+                "--condition_on_previous_text", configuration.conditionOnPreviousText ? "True" : "False",
                 "--output_dir", outputDirectory,
                 "--output_format", "txt",
                 "--verbose", "False"

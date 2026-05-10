@@ -1,86 +1,192 @@
-# Ambient Memo v1 Requirements
+# Ambient Memo Room Device Requirements
 
-Date: 2026-05-08 JST
+Date: 2026-05-09 JST
 
 ## Purpose
 
-Build a local-first, standalone ambient memo system that runs on a capable
-laptop and captures spoken knowledge without requiring a cloud backend.
+Build a local-first ambient memo system for shared room devices.
 
-This work is a feasibility and foundation phase for the standalone line. The
-goal is not feature breadth. The goal is to prove that the local pipeline can
-monitor speech, structure captured content, and preserve it as knowledge.
+This product is not a personal notes app. It is a device that belongs to an
+organization, is installed in a room or field site, and is used temporarily by
+people who are physically present there.
+
+The design target is:
+
+- local capture and local processing
+- organization-owned operation
+- short-lived operator access
+- strong privacy between one meeting and the next
 
 ## Product definition
 
-The product is a local-first ambient memo application centered on one active
-session at a time.
+The product is a shared, room-installed meeting device.
 
-For v1, a session means one operator-opened capture window, typically one
-meeting.
+Typical usage:
 
-It should:
+1. A device is assigned to one room or one field location.
+2. A person with permission starts access on that device.
+3. The device captures one meeting or one bounded recording activity.
+4. The result is viewed, copied, or printed on the spot.
+5. Access ends and the next person must not see the prior meeting contents.
 
-- let the operator open one local session
-- monitor microphone input continuously while that session is open
-- use VAD to decide when speech is present
-- record only the detected speech spans
-- persist each detected speech span as one utterance under the open session
-- group utterances into topics over time
-- transcribe detected speech locally
-- remain usable even with no network connection
+This is closer to a whiteboard or copier interaction model than to a personal
+workspace app.
 
-Assumption:
+## Core domain model
 
-- `VOD` in prior discussion is treated as `VAD` (`voice activity detection`)
+The system has four structural levels above captured content.
 
-## Core data model
-
-The system has three main aggregation levels.
-
-### 1. Session
+### 1. Organization
 
 Definition:
 
-- one operator-opened capture window
-- typically one meeting or one bounded recording activity
-- owns the topics and utterances created while it remains open
-- becomes read-mostly once the operator closes it
+- top-level owner of data and policy
+- usually one company or one legal operating unit
+- owns workspaces and devices
 
 Fields:
 
-- `session_id`
-- `started_at`
-- `ended_at`
+- `organization_id`
+- `name`
 - `status`
-- `title` later if needed
-- `utterance_count`
-- `topic_count`
+- `created_at`
 
-### 2. Topic
+### 2. Workspace
 
 Definition:
 
-- a cluster of utterances within one session
-- a topic continues while the gap between utterances does not exceed the topic
-  boundary threshold
-- the initial working rule is a new topic after 1 minute of silence
-- the exact threshold remains tunable
+- one operating unit under an organization
+- typically a branch, office, site, department, or business unit
+- owns multiple devices
+
+Fields:
+
+- `workspace_id`
+- `organization_id`
+- `name`
+- `code`
+- `status`
+- `created_at`
+
+### 3. Device
+
+Definition:
+
+- one installed shared machine
+- typically one room device or one field device
+- belongs to one workspace
+- acts as the physical boundary for in-room use
+
+Fields:
+
+- `device_id`
+- `organization_id`
+- `workspace_id`
+- `display_name`
+- `location_label`
+- `status`
+- `retention_policy_id`
+- `created_at`
+
+### 4. Account
+
+Definition:
+
+- one human identity with permission to use the system
+- not the owner of meeting data
+- may change frequently over time
+
+Fields:
+
+- `account_id`
+- `display_name`
+- `employee_code` later if needed
+- `status`
+- `created_at`
+
+### Organization membership
+
+Definition:
+
+- links one account to one organization
+- carries role and access policy
+
+Fields:
+
+- `membership_id`
+- `organization_id`
+- `account_id`
+- `role`
+- `status`
+- `created_at`
+
+## Session model
+
+The word `session` must be split into two meanings.
+
+### 1. AccessSession
+
+Definition:
+
+- one temporary access grant on one device
+- begins when a permitted person authenticates or unlocks the device
+- ends by logout, timeout, or forced reset
+
+Fields:
+
+- `access_session_id`
+- `device_id`
+- `account_id`
+- `started_at`
+- `ended_at`
+- `status`
+- `authentication_method`
+
+### 2. CaptureSession
+
+Definition:
+
+- one meeting or one bounded capture run
+- created on one device inside one workspace
+- may be initiated by a current access session
+- owns topics and utterances
+
+Fields:
+
+- `capture_session_id`
+- `organization_id`
+- `workspace_id`
+- `device_id`
+- `started_by_account_id`
+- `access_session_id` nullable
+- `started_at`
+- `ended_at`
+- `status`
+- `meeting_context_profile`
+- `utterance_count`
+- `topic_count`
+
+## Captured content model
+
+### Topic
+
+Definition:
+
+- a cluster of utterances within one capture session
+- the first working rule remains a new topic after 1 minute of silence
 
 Fields:
 
 - `topic_id`
-- `session_id`
+- `capture_session_id`
 - `started_at`
 - `ended_at`
 - `status`
-- `utterance_ids`
-- `topic_transcript`
-- `topic_summary`
-- `topic_keywords`
-- optional embedding / knowledge link fields later
+- `summary_text`
+- `summary_status`
+- `summary_error`
 
-### 3. Utterance
+### Utterance
 
 Definition:
 
@@ -90,7 +196,7 @@ Definition:
 Fields:
 
 - `utterance_id`
-- `session_id`
+- `capture_session_id`
 - `topic_id` nullable until grouped
 - `started_at`
 - `ended_at`
@@ -98,109 +204,149 @@ Fields:
 - `audio_file_path`
 - `transcript_text`
 - `transcription_status`
-- optional quality / confidence fields later
+- `transcription_error`
+
+## Ownership rules
+
+- `Organization` is the root owner of operational data.
+- `Workspace` is an operational grouping under one organization.
+- `Device` is the physical execution point under one workspace.
+- `Account` is an identity and permission subject, not the root owner of
+  captured meeting data.
+- `CaptureSession` belongs to `organization + workspace + device`.
+- `AccessSession` belongs to `device + account`.
+- `Topic` and `Utterance` inherit organization/workspace/device scope through
+  `CaptureSession`.
+
+## Privacy and retention requirements
+
+Privacy isolation is a first-class product requirement.
+
+The device must be safe for consecutive meetings by different people in the
+same room.
+
+Required behavior:
+
+- a person must not see the prior meeting by default when arriving at the
+  device
+- the UI must reset after logout or timeout
+- access to prior captured content must require explicit policy and permission
+- the system must support automatic purge or sealed retention based on device
+  policy
+
+The product must support device-level policy such as:
+
+- `require_login_to_start_capture`
+- `auto_logout_after_seconds`
+- `retain_capture_after_logout`
+- `purge_after_minutes`
+- `allow_print`
+- `allow_export`
+- `allow_reopen_closed_capture`
 
 ## Functional requirements
 
-### Session lifecycle
+### Shared device boot
 
-- the operator can create one new local session
-- the operator can explicitly start listening inside that session
-- the operator can explicitly stop listening without deleting prior utterances
-- the operator can explicitly close the session to finalize the captured set
-- only one active listening session is required for v1
+- one device is assigned to one workspace
+- device identity is fixed at bootstrap and does not need daily re-selection
+- the device can show its organization, workspace, and room identity in
+  diagnostics
 
-### Continuous listening
+### Access control
 
-- the app can stay active for long periods while one session is open
-- the microphone input is monitored continuously
-- raw audio is not saved continuously
-- recording begins only when VAD detects speech
-- silence or non-speech is ignored instead of being saved as one continuous raw
-  file
+- a permitted person can start an `AccessSession`
+- access may later be backed by badge tap, SSO, QR, PIN, or another short-lived
+  authentication method
+- access automatically ends after logout, inactivity, or policy timeout
+- capture start can be blocked when access is required but missing
 
-### Utterance segmentation
+### Capture lifecycle
 
-- speech separated by less than 3 seconds of silence remains one utterance
-- speech separated by 3 seconds or more becomes a new utterance
-- each utterance produces one saved audio artifact and one transcript artifact
+- a permitted person can create one `CaptureSession`
+- only one active capture session is required for the first implementation
+- the device can monitor microphone input continuously while capture is active
+- VAD determines speech spans
+- each detected span is stored as one utterance under the active capture session
+- topic grouping happens within one capture session
 
-### Topic segmentation
+### Local processing
 
-- topic grouping happens within one session
-- utterances separated by less than 1 minute remain in the same topic
-- utterances separated by 1 minute or more start a new topic
-- topics are updated incrementally as new utterances arrive
-- the 1-minute threshold is the first working rule, not a permanently frozen
-  product constant
+- ASR runs locally
+- summarization runs locally
+- failure in ASR or summarization must not crash the capture runtime
+- failed work remains visible for operator inspection while access is active
 
-### Local ASR
+### On-site result delivery
 
-- ASR must run locally
-- the first validation target is correctness and repeatability, not final model
-  optimization
-- ASR failure must not crash the capture loop
-- failed utterances remain visible and retryable
+- the primary result path is on-device review
+- the system may support copy, export, or print depending on device policy
+- output should be treated as bounded to the current access period unless policy
+  explicitly allows retention
 
-### Local summarization
+### Purge and reset
 
-- topic-level summarization runs locally
-- summarization is not required to block utterance capture
-- summary generation may be deferred or retried
-
-### Knowledge accumulation
-
-- sessions, utterances, and topics persist locally
-- the local store should support later promotion into a knowledge layer
-- v1 only needs the persistence model and retrieval hooks, not a full knowledge
-  UI
+- the system can reset the room UI after access ends
+- the system can purge local artifacts after a configured TTL
+- purge must cover audio, transcript, summary, and transient job evidence when
+  policy requires full deletion
 
 ## Non-functional requirements
 
 ### Local-first
 
-- no cloud dependency for the standalone line
-- app remains functional offline
+- no required cloud dependency for core capture and summary
+- app remains functional offline after local setup
 - models are local files, not runtime downloads
+
+### Privacy
+
+- room-to-room and meeting-to-meeting isolation is mandatory
+- prior meeting content must not remain casually browsable on a shared device
 
 ### Robustness
 
-- failures in ASR or summary jobs are isolated and recoverable
-- long-running capture should not require manual file repair
-- app restart should preserve state
+- failures in ASR, summary, purge, or auth timeout handling are isolated and
+  observable
+- app restart should preserve durable state according to retention policy
+- interrupted summary execution must not leave indefinite `running` state that
+  requires direct database intervention
 
 ### Observability
 
-- operator can inspect current capture state
-- operator can inspect session, topic, and utterance states
-- operator can inspect errors, model paths, and job status
+- operator can inspect current device identity
+- operator can inspect current access state
+- operator can inspect active capture state, jobs, and errors
+- operator can trigger a safe maintenance recovery path for stale summary state
+- diagnostics must make policy and storage behavior explainable
 
-### Simplicity
-
-- v1 should prefer a narrow vertical slice over broad features
-- avoid premature multimodal expansion
-- avoid premature knowledge UI expansion
-
-## Explicit non-goals for v1
+## Explicit non-goals for the next phase
 
 - cloud sync
-- collaboration
-- system-audio capture
-- video understanding
+- multi-device content sharing
+- web dashboard integration
+- large-scale knowledge retrieval UX
 - speaker diarization
-- live chat over all captured knowledge
-- large-scale retrieval UX
+- browser-first deployment
 
-## Recommended v1 vertical slice
+## Immediate design consequences
 
-The first meaningful standalone proof should be:
+- the current `Session` concept must be reinterpreted as `CaptureSession`
+- a new `AccessSession` concept is required
+- organization, workspace, device, account, and membership tables are required
+- retention and purge policy must be designed as core product behavior, not as
+  cleanup later
 
-1. always-on microphone monitoring inside one open session
-2. operator-opened session lifecycle
-3. VAD-based utterance detection
-4. utterance audio save
-5. local utterance ASR
-6. topic grouping by silence-gap rule
-7. local persistence and inspection UI
+## First redesign vertical slice
 
-That is the real v1. Everything else is secondary.
+The next meaningful implementation slice is:
+
+1. bootstrap one organization, workspace, and device
+2. create one local operator account model and one membership model
+3. add short-lived `AccessSession`
+4. rename current meeting `Session` into `CaptureSession`
+5. attach all captured content to `organization + workspace + device`
+6. enforce UI reset and non-browsable prior meeting behavior after access end
+7. add policy-driven purge groundwork
+
+That is the real baseline for the room-device version.

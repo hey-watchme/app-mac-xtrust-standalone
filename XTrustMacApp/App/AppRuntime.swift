@@ -5,11 +5,17 @@ import Foundation
 struct AppRuntime {
     let paths: WorkspacePaths
     let sessionStore: SQLiteSessionStore
+    let sharedDeviceContext: SharedDeviceContext
+    let accessSessionService: AccessSessionService
+    let staleSummaryRecoveryService: StaleSummaryRecoveryService
+    let initialRecoveredStaleSummaryCount: Int
+    let initialAccessSession: AccessSession?
     let sessionService: SessionService
     let microphoneRecorder: MicrophoneRecorder
     let audioPlaybackController: AudioPlaybackController
     let whisperTranscriber: WhisperCLITranscriber
     let gemmaSummarizer: MLXSummarizer
+    let summarySummarizer: any Summarizer
     let transcriptionJobRunner: TranscriptionJobRunner
     let topicSummaryRunner: TopicSummaryRunner
     let captureRuntime: CaptureRuntime
@@ -31,7 +37,34 @@ struct AppRuntime {
             modelsRootDirectory: modelsRoot
         )
         let gemmaSummarizer = MLXSummarizer(configuration: gemmaConfiguration)
+        let summarySummarizer = SerializedSummarizer(base: gemmaSummarizer)
         let sessionStore = SQLiteSessionStore(databaseURL: paths.database)
+        try sessionStore.initialize()
+        let staleSummaryRecoveryService = StaleSummaryRecoveryService(
+            sessionStore: sessionStore,
+            topicStore: sessionStore
+        )
+        let recoveredStaleSummaryCount = try staleSummaryRecoveryService.recover()
+        let sharedDeviceBootstrap = SharedDeviceBootstrapService(
+            organizationStore: sessionStore,
+            workspaceStore: sessionStore,
+            deviceStore: sessionStore,
+            accountStore: sessionStore,
+            organizationMembershipStore: sessionStore,
+            clock: SystemClock()
+        )
+        let sharedDeviceContext = try sharedDeviceBootstrap.run(
+            configuration: .developmentDefault(
+                deviceName: Host.current().localizedName ?? "This Mac"
+            )
+        )
+        let accessSessionService = AccessSessionService(
+            accessSessionStore: sessionStore,
+            clock: SystemClock()
+        )
+        let initialAccessSession = try accessSessionService.activeAccessSession(
+            deviceID: sharedDeviceContext.device.id
+        )
         let sessionService = SessionService(
             sessionStore: sessionStore,
             clock: SystemClock()
@@ -51,7 +84,7 @@ struct AppRuntime {
             topicStore: sessionStore,
             utteranceStore: sessionStore,
             transcriptArtifactStore: sessionStore,
-            summarizer: gemmaSummarizer
+            summarizer: summarySummarizer
         )
         let captureRuntime = CaptureRuntime(
             captureController: AVAudioCaptureController(),
@@ -61,23 +94,38 @@ struct AppRuntime {
             topicAssignmentService: topicAssignmentService
         )
 
-        try sessionStore.initialize()
-        let sessions = try sessionService.loadSessions()
+        let sessions = if initialAccessSession == nil {
+            [Session]()
+        } else {
+            try sessionService.loadSessions()
+        }
 
         return AppRuntime(
             paths: paths,
             sessionStore: sessionStore,
+            sharedDeviceContext: sharedDeviceContext,
+            accessSessionService: accessSessionService,
+            staleSummaryRecoveryService: staleSummaryRecoveryService,
+            initialRecoveredStaleSummaryCount: recoveredStaleSummaryCount,
+            initialAccessSession: initialAccessSession,
             sessionService: sessionService,
             microphoneRecorder: microphoneRecorder,
             audioPlaybackController: audioPlaybackController,
             whisperTranscriber: whisperTranscriber,
             gemmaSummarizer: gemmaSummarizer,
+            summarySummarizer: summarySummarizer,
             transcriptionJobRunner: transcriptionJobRunner,
             topicSummaryRunner: topicSummaryRunner,
             captureRuntime: captureRuntime,
             initialSessions: sessions,
             diagnostics: AppDiagnostics(
                 paths: paths,
+                sharedDeviceContext: sharedDeviceContext,
+                accessActive: initialAccessSession != nil,
+                activeAccessAccountDisplayName: initialAccessSession?.accountID == sharedDeviceContext.bootstrapAccount.id
+                    ? sharedDeviceContext.bootstrapAccount.displayName
+                    : nil,
+                recoveredStaleSummaryCount: recoveredStaleSummaryCount,
                 recordingActive: microphoneRecorder.isRecording,
                 whisperConfiguration: whisperTranscriber.configuration,
                 mlxConfiguration: gemmaConfiguration
