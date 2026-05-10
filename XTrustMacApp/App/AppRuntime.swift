@@ -13,7 +13,7 @@ struct AppRuntime {
     let sessionService: SessionService
     let microphoneRecorder: MicrophoneRecorder
     let audioPlaybackController: AudioPlaybackController
-    let whisperTranscriber: WhisperCLITranscriber
+    let moonshineTranscriber: MoonshineSherpaTranscriber
     let gemmaSummarizer: MLXSummarizer
     let summarySummarizer: any Summarizer
     let transcriptionJobRunner: TranscriptionJobRunner
@@ -30,7 +30,7 @@ struct AppRuntime {
         let bootstrap = BootstrapWorkspace(fileManager: LocalFileManager())
         _ = try bootstrap.run(paths: paths)
         let modelsRoot = paths.models.path(percentEncoded: false)
-        let whisperTranscriber = WhisperCLITranscriber(
+        let moonshineTranscriber = MoonshineSherpaTranscriber(
             configuration: .developmentDefault(modelsRootDirectory: modelsRoot)
         )
         let gemmaConfiguration = MLXSummarizerConfiguration.developmentDefault(
@@ -73,7 +73,7 @@ struct AppRuntime {
             paths: paths,
             jobStore: sessionStore,
             transcriptArtifactStore: sessionStore,
-            transcriber: whisperTranscriber,
+            transcriber: moonshineTranscriber,
             clock: SystemClock()
         )
         let topicAssignmentService = TopicAssignmentService(
@@ -111,7 +111,7 @@ struct AppRuntime {
             sessionService: sessionService,
             microphoneRecorder: microphoneRecorder,
             audioPlaybackController: audioPlaybackController,
-            whisperTranscriber: whisperTranscriber,
+            moonshineTranscriber: moonshineTranscriber,
             gemmaSummarizer: gemmaSummarizer,
             summarySummarizer: summarySummarizer,
             transcriptionJobRunner: transcriptionJobRunner,
@@ -127,7 +127,7 @@ struct AppRuntime {
                     : nil,
                 recoveredStaleSummaryCount: recoveredStaleSummaryCount,
                 recordingActive: microphoneRecorder.isRecording,
-                whisperConfiguration: whisperTranscriber.configuration,
+                moonshineConfiguration: moonshineTranscriber.configuration,
                 mlxConfiguration: gemmaConfiguration
             )
         )

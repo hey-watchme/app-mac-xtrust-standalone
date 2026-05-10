@@ -45,8 +45,8 @@ struct DiagnosticsView: View {
                 value: diagnostics.activeAccessAccountDisplayName ?? "None"
             )
             CopyableDetailRow(
-                title: "Whisper Model",
-                value: diagnostics.whisperModelPath,
+                title: "Moonshine Model",
+                value: diagnostics.moonshineModelDirectory,
                 isMonospaced: true
             )
             CopyableDetailRow(
@@ -80,7 +80,7 @@ struct DiagnosticsView: View {
             statusRow("Transcript Directory", isReady: diagnostics.transcriptsReady)
             statusRow("Summary Directory", isReady: diagnostics.summariesReady)
             statusRow("Models Directory", isReady: diagnostics.modelsReady)
-            statusRow("Whisper Model Ready", isReady: diagnostics.whisperModelReady)
+            statusRow("Moonshine Model Ready", isReady: diagnostics.moonshineModelReady)
             statusRow("Gemma 4 MLX Ready", isReady: diagnostics.gemmaModelReady)
             statusRow("Database File", isReady: diagnostics.databaseReady)
             statusRow("Access Active", isReady: diagnostics.accessActive)

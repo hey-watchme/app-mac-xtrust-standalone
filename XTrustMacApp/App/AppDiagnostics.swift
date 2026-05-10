@@ -7,7 +7,7 @@ struct AppDiagnostics {
     let sharedDeviceContext: SharedDeviceContext
     let accessActive: Bool
     let activeAccessAccountDisplayName: String?
-    let whisperModelPath: String
+    let moonshineModelDirectory: String
     let mlxModelDirectory: String
     let mlxRequiredAvailableMemoryBytes: UInt64
     let currentAvailableMemoryBytes: UInt64?
@@ -16,7 +16,7 @@ struct AppDiagnostics {
     let transcriptsReady: Bool
     let summariesReady: Bool
     let modelsReady: Bool
-    let whisperModelReady: Bool
+    let moonshineModelReady: Bool
     let gemmaModelReady: Bool
     let databaseReady: Bool
     let recordingActive: Bool
@@ -29,7 +29,7 @@ struct AppDiagnostics {
         recoveredStaleSummaryCount: Int = 0,
         fileManager: FileManager = .default,
         recordingActive: Bool = false,
-        whisperConfiguration: WhisperCLITranscriberConfiguration,
+        moonshineConfiguration: MoonshineSherpaTranscriberConfiguration,
         mlxConfiguration: MLXSummarizerConfiguration
     ) {
         self.workspaceRoot = paths.root
@@ -37,7 +37,7 @@ struct AppDiagnostics {
         self.sharedDeviceContext = sharedDeviceContext
         self.accessActive = accessActive
         self.activeAccessAccountDisplayName = activeAccessAccountDisplayName
-        self.whisperModelPath = whisperConfiguration.expectedModelFilePath
+        self.moonshineModelDirectory = moonshineConfiguration.modelDirectory
         self.mlxModelDirectory = mlxConfiguration.modelDirectory
         self.mlxRequiredAvailableMemoryBytes = mlxConfiguration.requiredAvailableMemoryBytes
         self.currentAvailableMemoryBytes = try? SystemMemorySnapshot.capture().availableBytes
@@ -46,7 +46,7 @@ struct AppDiagnostics {
         self.transcriptsReady = fileManager.fileExists(atPath: paths.transcripts.path(percentEncoded: false))
         self.summariesReady = fileManager.fileExists(atPath: paths.summaries.path(percentEncoded: false))
         self.modelsReady = fileManager.fileExists(atPath: paths.models.path(percentEncoded: false))
-        self.whisperModelReady = fileManager.fileExists(atPath: whisperConfiguration.expectedModelFilePath)
+        self.moonshineModelReady = fileManager.fileExists(atPath: moonshineConfiguration.expectedEncoderPath)
         self.gemmaModelReady = mlxConfiguration.modelReady
         self.databaseReady = fileManager.fileExists(atPath: paths.database.path(percentEncoded: false))
         self.recordingActive = recordingActive

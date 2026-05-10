@@ -19,7 +19,7 @@ final class AppState: ObservableObject {
     let persistenceStore: any SessionPersistenceStore
     let microphoneRecorder: MicrophoneRecorder
     let audioPlaybackController: AudioPlaybackController
-    let whisperTranscriber: WhisperCLITranscriber
+    let moonshineTranscriber: MoonshineSherpaTranscriber
     let gemmaSummarizer: MLXSummarizer
     let summarySummarizer: any Summarizer
     let transcriptionJobRunner: TranscriptionJobRunner
@@ -57,7 +57,7 @@ final class AppState: ObservableObject {
             persistenceStore: runtime.sessionStore,
             microphoneRecorder: runtime.microphoneRecorder,
             audioPlaybackController: runtime.audioPlaybackController,
-            whisperTranscriber: runtime.whisperTranscriber,
+            moonshineTranscriber: runtime.moonshineTranscriber,
             gemmaSummarizer: runtime.gemmaSummarizer,
             summarySummarizer: runtime.summarySummarizer,
             transcriptionJobRunner: runtime.transcriptionJobRunner,
@@ -88,7 +88,7 @@ final class AppState: ObservableObject {
         persistenceStore: any SessionPersistenceStore,
         microphoneRecorder: MicrophoneRecorder,
         audioPlaybackController: AudioPlaybackController,
-        whisperTranscriber: WhisperCLITranscriber,
+        moonshineTranscriber: MoonshineSherpaTranscriber,
         gemmaSummarizer: MLXSummarizer,
         summarySummarizer: any Summarizer,
         transcriptionJobRunner: TranscriptionJobRunner,
@@ -114,7 +114,7 @@ final class AppState: ObservableObject {
         self.persistenceStore = persistenceStore
         self.microphoneRecorder = microphoneRecorder
         self.audioPlaybackController = audioPlaybackController
-        self.whisperTranscriber = whisperTranscriber
+        self.moonshineTranscriber = moonshineTranscriber
         self.gemmaSummarizer = gemmaSummarizer
         self.summarySummarizer = summarySummarizer
         self.transcriptionJobRunner = transcriptionJobRunner
@@ -281,7 +281,7 @@ final class AppState: ObservableObject {
             activeAccessAccountDisplayName: activeAccessAccountDisplayName,
             recoveredStaleSummaryCount: recoveredStaleSummaryCount,
             recordingActive: captureRuntime.isCapturing,
-            whisperConfiguration: whisperTranscriber.configuration,
+            moonshineConfiguration: moonshineTranscriber.configuration,
             mlxConfiguration: gemmaSummarizer.configuration
         )
     }
