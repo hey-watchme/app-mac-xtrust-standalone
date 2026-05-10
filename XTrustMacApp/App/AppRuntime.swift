@@ -14,6 +14,7 @@ struct AppRuntime {
     let microphoneRecorder: MicrophoneRecorder
     let audioPlaybackController: AudioPlaybackController
     let moonshineTranscriber: MoonshineSherpaTranscriber
+    let pressureMonitor: MemoryPressureMonitor
     let gemmaSummarizer: MLXSummarizer
     let summarySummarizer: any Summarizer
     let transcriptionJobRunner: TranscriptionJobRunner
@@ -36,7 +37,9 @@ struct AppRuntime {
         let gemmaConfiguration = MLXSummarizerConfiguration.developmentDefault(
             modelsRootDirectory: modelsRoot
         )
-        let gemmaSummarizer = MLXSummarizer(configuration: gemmaConfiguration)
+        let pressureMonitor = MemoryPressureMonitor()
+        pressureMonitor.start()
+        let gemmaSummarizer = MLXSummarizer(configuration: gemmaConfiguration, pressureMonitor: pressureMonitor)
         let summarySummarizer = SerializedSummarizer(base: gemmaSummarizer)
         let sessionStore = SQLiteSessionStore(databaseURL: paths.database)
         try sessionStore.initialize()
@@ -112,6 +115,7 @@ struct AppRuntime {
             microphoneRecorder: microphoneRecorder,
             audioPlaybackController: audioPlaybackController,
             moonshineTranscriber: moonshineTranscriber,
+            pressureMonitor: pressureMonitor,
             gemmaSummarizer: gemmaSummarizer,
             summarySummarizer: summarySummarizer,
             transcriptionJobRunner: transcriptionJobRunner,

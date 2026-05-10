@@ -60,6 +60,7 @@ Technical stack and implementation planning are tracked in:
 - `docs/testing-strategy.md`
 - `docs/design-system.md`
 - `docs/manual-verification.md`
+- `docs/summary-runtime-safety.md`
 
 ## Why this project exists
 

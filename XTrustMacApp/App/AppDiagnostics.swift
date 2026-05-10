@@ -9,7 +9,6 @@ struct AppDiagnostics {
     let activeAccessAccountDisplayName: String?
     let moonshineModelDirectory: String
     let mlxModelDirectory: String
-    let mlxRequiredAvailableMemoryBytes: UInt64
     let currentAvailableMemoryBytes: UInt64?
     let recoveredStaleSummaryCount: Int
     let audioReady: Bool
@@ -39,7 +38,6 @@ struct AppDiagnostics {
         self.activeAccessAccountDisplayName = activeAccessAccountDisplayName
         self.moonshineModelDirectory = moonshineConfiguration.modelDirectory
         self.mlxModelDirectory = mlxConfiguration.modelDirectory
-        self.mlxRequiredAvailableMemoryBytes = mlxConfiguration.requiredAvailableMemoryBytes
         self.currentAvailableMemoryBytes = try? SystemMemorySnapshot.capture().availableBytes
         self.recoveredStaleSummaryCount = recoveredStaleSummaryCount
         self.audioReady = fileManager.fileExists(atPath: paths.audio.path(percentEncoded: false))

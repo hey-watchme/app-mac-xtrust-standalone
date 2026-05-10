@@ -248,11 +248,16 @@ Rules:
 
 - the device must not launch multiple MLX summary subprocesses concurrently from
   repeated button presses
-- summary admission can reject work before launch when prompt size or available
-  memory is outside the safe envelope
+- summary admission must not block normal operation with conservative static
+  thresholds; the host crash boundary is enforced by OS memory pressure events
+  and subprocess kill, not by pre-flight byte budgets
 - any `summary_status = running` state found after app restart is stale by
   definition and must be recoverable without direct SQLite intervention
 - access history and purge history should be independently inspectable
+
+The detailed crash-prevention architecture (multi-layer defense with
+`DispatchSource` memory pressure monitoring and subprocess kill) is documented
+separately in `summary-runtime-safety.md`.
 
 ## Security and privacy boundaries
 

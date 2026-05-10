@@ -7,7 +7,6 @@ struct MLXSummarizerConfiguration: Sendable {
     let modelDirectory: String
     let maxTokens: Int
     let maxPromptCharacters: Int
-    let requiredAvailableMemoryBytes: UInt64
 
     var modelReady: Bool {
         var isDir: ObjCBool = false
@@ -18,14 +17,12 @@ struct MLXSummarizerConfiguration: Sendable {
         pythonExecutablePath: String,
         modelDirectory: String,
         maxTokens: Int = 512,
-        maxPromptCharacters: Int = 18_000,
-        requiredAvailableMemoryBytes: UInt64 = 8 * 1_024 * 1_024 * 1_024
+        maxPromptCharacters: Int = 18_000
     ) {
         self.pythonExecutablePath = pythonExecutablePath
         self.modelDirectory = modelDirectory
         self.maxTokens = maxTokens
         self.maxPromptCharacters = maxPromptCharacters
-        self.requiredAvailableMemoryBytes = requiredAvailableMemoryBytes
     }
 
     static func developmentDefault(modelsRootDirectory: String) -> MLXSummarizerConfiguration {
@@ -61,6 +58,7 @@ struct MLXSummarizerConfiguration: Sendable {
 
 struct MLXSummarizer: Summarizer, Sendable {
     let configuration: MLXSummarizerConfiguration
+    let pressureMonitor: MemoryPressureMonitor?
 
     var modelIdentifier: String { "gemma-4-e4b-it-4bit" }
 
@@ -78,8 +76,13 @@ struct MLXSummarizer: Summarizer, Sendable {
 
         let prompt = buildPrompt(for: request)
         try validatePromptSize(prompt)
-        try validateMemoryBudget()
+        try validateSanityCheck()
+
         let result = try await runProcess(prompt: prompt)
+
+        if result.terminationReason == .uncaughtSignal && result.exitCode == SIGKILL {
+            throw MLXSummarizerError.killedByMemoryPressure
+        }
 
         guard result.exitCode == 0 else {
             throw MLXSummarizerError.processFailed(
@@ -176,12 +179,15 @@ struct MLXSummarizer: Summarizer, Sendable {
         }
     }
 
-    private func validateMemoryBudget() throws {
-        let snapshot = try SystemMemorySnapshot.capture()
-        guard snapshot.availableBytes >= configuration.requiredAvailableMemoryBytes else {
-            throw MLXSummarizerError.insufficientMemory(
-                availableBytes: snapshot.availableBytes,
-                requiredBytes: configuration.requiredAvailableMemoryBytes
+    // Blocks only on extreme conditions (< 500 MB free) where attempting
+    // the subprocess would almost certainly fail immediately.
+    // Normal memory management is handled by MemoryPressureMonitor at runtime.
+    private func validateSanityCheck() throws {
+        guard let snapshot = try? SystemMemorySnapshot.capture() else { return }
+        let minimumBytes: UInt64 = 512 * 1_024 * 1_024
+        guard snapshot.availableBytes >= minimumBytes else {
+            throw MLXSummarizerError.startupBlockedBySystemPressure(
+                availableBytes: snapshot.availableBytes
             )
         }
     }
@@ -296,13 +302,18 @@ struct MLXSummarizer: Summarizer, Sendable {
 
         try process.run()
 
-        return try await withCheckedThrowingContinuation { continuation in
+        let pid = process.processIdentifier
+        pressureMonitor?.register(pid: pid, label: "mlx_vlm summarizer")
+
+        return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 process.waitUntilExit()
+                self.pressureMonitor?.unregister(pid: pid)
                 let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
                 let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
                 continuation.resume(returning: SummaryProcessResult(
                     exitCode: process.terminationStatus,
+                    terminationReason: process.terminationReason,
                     standardOutput: String(data: stdoutData, encoding: .utf8)?
                         .trimmingCharacters(in: .whitespacesAndNewlines),
                     standardError: String(data: stderrData, encoding: .utf8)?
@@ -335,6 +346,7 @@ struct MLXSummarizer: Summarizer, Sendable {
 
 private struct SummaryProcessResult: Sendable {
     let exitCode: Int32
+    let terminationReason: Process.TerminationReason
     let standardOutput: String?
     let standardError: String?
 }
@@ -344,7 +356,8 @@ enum MLXSummarizerError: LocalizedError {
     case processFailed(exitCode: Int32, stderr: String)
     case emptyOutput
     case promptTooLarge(limit: Int, actual: Int)
-    case insufficientMemory(availableBytes: UInt64, requiredBytes: UInt64)
+    case killedByMemoryPressure
+    case startupBlockedBySystemPressure(availableBytes: UInt64)
     case memoryProbeFailed(message: String)
 
     var errorDescription: String? {
@@ -357,8 +370,11 @@ enum MLXSummarizerError: LocalizedError {
             return "mlx_lm.generate produced no output."
         case let .promptTooLarge(limit, actual):
             return "要約入力が大きすぎるため実行を中止しました。Prompt size: \(actual) chars. Limit: \(limit) chars."
-        case let .insufficientMemory(availableBytes, requiredBytes):
-            return "メモリ不足のため要約を開始しません。Available: \(ByteCountFormatter.string(fromByteCount: Int64(availableBytes), countStyle: .memory)). Required: \(ByteCountFormatter.string(fromByteCount: Int64(requiredBytes), countStyle: .memory))."
+        case .killedByMemoryPressure:
+            return "システムのメモリ圧迫が critical に達したため、要約プロセスを停止しました。しばらくしてから再試行してください。"
+        case let .startupBlockedBySystemPressure(availableBytes):
+            let formatted = ByteCountFormatter.string(fromByteCount: Int64(availableBytes), countStyle: .memory)
+            return "空きメモリが極小 (\(formatted)) のため要約を開始できません。他のアプリを終了してから再試行してください。"
         case let .memoryProbeFailed(message):
             return "メモリ状態を確認できないため要約を開始しませんでした。\(message)"
         }

@@ -216,9 +216,42 @@ Mitigation:
 - then migrate current `sessions` into `capture_sessions`
 - keep migration steps explicit and testable
 
-## Recommended first coding task
+## Immediate priority: summary crash prevention
 
-The next coding task after the current session should be:
+Before Step 5 (CaptureSession rename), the summary pipeline must be unblocked.
+The current static 8 GB memory check prevents all summarization from succeeding
+without making the host Mac safe.
+
+See `summary-runtime-safety.md` for the full design.
+
+Implementation tasks (in order):
+
+1. Create `MemoryPressureMonitor` actor in
+   `Packages/AppCore/Sources/AppCore/Application/`
+   - subscribe to `DispatchSource` memory pressure events
+   - kill registered subprocess PIDs on `.critical`
+   - expose pressure level and event history for diagnostics
+
+2. Update `MLXSummarizer`:
+   - replace `validateMemoryBudget()` with a minimal sanity check
+   - register subprocess PID with `MemoryPressureMonitor` after launch
+   - unregister on subprocess exit
+   - handle `SIGKILL` termination as `killedByMemoryPressure` error
+
+3. Update `MLXSummarizerError`:
+   - add `killedByMemoryPressure(reason: String)`
+   - add `startupBlockedBySystemPressure`
+   - deprecate `insufficientMemory`
+
+4. Update `DiagnosticsView` and `AppDiagnostics`:
+   - show current memory pressure level
+   - show recent kill events
+   - remove "MLX Required Memory" display (static threshold removed)
+
+Acceptance gate: summarization succeeds in normal conditions; Mac does not crash
+under memory pressure.
+
+## Recommended next coding task (after crash prevention)
 
 1. rename the current `Session` domain model into `CaptureSession`
 2. migrate SQLite and service boundaries so meeting data belongs to

@@ -55,11 +55,8 @@ struct DiagnosticsView: View {
                 isMonospaced: true
             )
             CopyableDetailRow(
-                title: "MLX Required Memory",
-                value: ByteCountFormatter.string(
-                    fromByteCount: Int64(diagnostics.mlxRequiredAvailableMemoryBytes),
-                    countStyle: .memory
-                ),
+                title: "Memory Safety",
+                value: "Pressure monitoring active",
                 showCopyButton: false
             )
             CopyableDetailRow(

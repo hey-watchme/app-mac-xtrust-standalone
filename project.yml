@@ -21,7 +21,8 @@ targets:
         SWIFT_VERSION: 6.0
         MACOSX_DEPLOYMENT_TARGET: 15.0
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: ""
+        DEVELOPMENT_TEAM: 48P276DZDB
+        CODE_SIGNING_IDENTITY: "Apple Development"
     dependencies:
       - package: AppCore
         product: AppCore
