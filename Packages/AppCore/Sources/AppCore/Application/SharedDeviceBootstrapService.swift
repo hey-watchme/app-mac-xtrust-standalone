@@ -56,7 +56,7 @@ public struct SharedDeviceBootstrapConfiguration: Equatable, Sendable {
             workspaceCode: "DEFAULT",
             deviceDisplayName: deviceName,
             deviceLocationLabel: "This Mac",
-            bootstrapAccountDisplayName: "Local Operator",
+            bootstrapAccountDisplayName: "ゲスト",
             bootstrapAccountEmployeeCode: nil
         )
     }

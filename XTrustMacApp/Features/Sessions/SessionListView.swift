@@ -94,6 +94,11 @@ private struct SidebarView: View {
             Divider()
                 .padding(.horizontal, XT.S.md)
 
+            newSessionListButton
+
+            Divider()
+                .padding(.horizontal, XT.S.md)
+
             if sessions.isEmpty {
                 sidebarEmpty
             } else {
@@ -116,10 +121,6 @@ private struct SidebarView: View {
             HStack {
                 XTrustLogoView()
                 Spacer()
-                Button(action: onLogout) {
-                    Label("退出", systemImage: "rectangle.portrait.and.arrow.right")
-                }
-                .buttonStyle(XTSecondaryButtonStyle())
             }
 
             HStack {
@@ -131,6 +132,28 @@ private struct SidebarView: View {
         }
         .padding(.horizontal, XT.S.lg)
         .padding(.vertical, XT.S.md)
+    }
+
+    // MARK: New Session List Button
+
+    private var newSessionListButton: some View {
+        Button(action: onNewSession) {
+            HStack(spacing: XT.S.sm) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(XT.C.accent)
+                Text("新規セッション")
+                    .font(XT.F.sidebarItem)
+                    .foregroundStyle(XT.C.accent)
+                Spacer()
+            }
+            .padding(.horizontal, XT.S.md)
+            .padding(.vertical, XT.S.sm + 1)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, XT.S.sm)
+        .padding(.vertical, XT.S.xs)
     }
 
     // MARK: Session List
@@ -175,17 +198,17 @@ private struct SidebarView: View {
 
     private var footerMenu: some View {
         VStack(spacing: 0) {
-            newSessionButton
+            logoutButton
             settingsButton
         }
     }
 
-    private var newSessionButton: some View {
+    private var logoutButton: some View {
         sidebarFooterButton(
-            title: "新規セッション",
-            systemImage: "plus.circle.fill",
+            title: "退出",
+            systemImage: "rectangle.portrait.and.arrow.right",
             isSelected: false,
-            action: onNewSession
+            action: onLogout
         )
     }
 
@@ -261,24 +284,31 @@ private struct LockedDeviceView: View {
                         VStack(alignment: .leading, spacing: XT.S.sm) {
                             CopyableDetailRow(
                                 title: "Organization",
-                                value: appState.sharedDeviceContext.organization.name
+                                value: appState.sharedDeviceContext.organization.name,
+                                showCopyButton: false
                             )
                             CopyableDetailRow(
                                 title: "Workspace",
-                                value: appState.sharedDeviceContext.workspace.name
+                                value: appState.sharedDeviceContext.workspace.name,
+                                showCopyButton: false
                             )
                             CopyableDetailRow(
                                 title: "Device",
-                                value: appState.sharedDeviceContext.device.displayName
+                                value: appState.sharedDeviceContext.device.displayName,
+                                showCopyButton: false
                             )
                             if let location = appState.sharedDeviceContext.device.locationLabel {
-                                CopyableDetailRow(title: "Location", value: location)
+                                CopyableDetailRow(
+                                    title: "Location",
+                                    value: location,
+                                    showCopyButton: false
+                                )
                             }
                         }
 
                         HStack {
                             Button(action: { appState.beginLocalAccess() }) {
-                                Label("利用を開始", systemImage: "person.crop.circle.badge.checkmark")
+                                Label("ゲストとして利用を開始", systemImage: "person.circle.fill")
                             }
                             .buttonStyle(XTPrimaryButtonStyle())
 

@@ -160,6 +160,7 @@ final class AppState: ObservableObject {
             errorMessage = "利用開始後にセッションを作成してください。"
             return
         }
+        if isListening { stopListening() }
         do {
             let session = try sessionService.createSession()
             visibleSessionIDs.insert(session.id)
@@ -460,7 +461,7 @@ final class AppState: ObservableObject {
             let session = try accessSessionService.beginAccess(
                 deviceID: sharedDeviceContext.device.id,
                 accountID: sharedDeviceContext.bootstrapAccount.id,
-                authenticationMethod: .localMock
+                authenticationMethod: .guest
             )
             activeAccessSession = session
             isShowingSettings = false

@@ -31,14 +31,14 @@
 
 /* Begin PBXFileReference section */
 		0B8203599318178CFC0FE23E /* AppCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AppCore; path = Packages/AppCore; sourceTree = SOURCE_ROOT; };
-		0BD655090BEE7DF2EB7611B1 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
-		19EAA66F29F08A3D78813E77 /* logo_xtrust_black.svg */ = {isa = PBXFileReference; path = logo_xtrust_black.svg; sourceTree = "<group>"; };
+		0BD655090BEE7DF2EB7611B1 /* .gitkeep */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitkeep; sourceTree = "<group>"; };
+		19EAA66F29F08A3D78813E77 /* logo_xtrust_black.svg */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = logo_xtrust_black.svg; sourceTree = "<group>"; };
 		1B717838272D4016CA9091B5 /* CopyableDetailRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyableDetailRow.swift; sourceTree = "<group>"; };
 		2B3244AF913524D3AE9012DE /* MLXSummarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLXSummarizer.swift; sourceTree = "<group>"; };
 		3556079B74CE405811406122 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		3BFEC83FD81FE76DA1667151 /* SessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListView.swift; sourceTree = "<group>"; };
-		43DB9155B0668067122FED0D /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
-		4C8DF5CE8FDA201EC2E3DC06 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
+		43DB9155B0668067122FED0D /* .gitkeep */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitkeep; sourceTree = "<group>"; };
+		4C8DF5CE8FDA201EC2E3DC06 /* .gitkeep */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitkeep; sourceTree = "<group>"; };
 		543D897CB093CF85ACFB0C15 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		6432B9AEAE14BE6F8FDE43A8 /* WhisperTranscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperTranscriber.swift; sourceTree = "<group>"; };
 		89A49548DD7BC0427330E618 /* XTrustMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XTrustMacApp.swift; sourceTree = "<group>"; };
@@ -51,7 +51,7 @@
 		BD590FC1C81A0DA1FA3DCB16 /* AVAudioCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVAudioCaptureController.swift; sourceTree = "<group>"; };
 		C87E0546F37CE687A12C03E5 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
 		CE57E48760C5E12FE75244C1 /* AppRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntime.swift; sourceTree = "<group>"; };
-		D3211A8FB80887592033D556 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
+		D3211A8FB80887592033D556 /* .gitkeep */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitkeep; sourceTree = "<group>"; };
 		E584EAA8B416D632F343D32B /* XTrustTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XTrustTheme.swift; sourceTree = "<group>"; };
 		EC877D5F1F438AFC5A5F45AC /* MicrophoneRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneRecorder.swift; sourceTree = "<group>"; };
 		ED547DCBCF6CC917E2B8427E /* XTrustMacApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XTrustMacApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -205,7 +205,6 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					8F0C40B22EC9B4BA22EBC79E = {
-						DevelopmentTeam = 48P276DZDB;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -279,7 +278,7 @@
 				CODE_SIGNING_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = 48P276DZDB;
+				DEVELOPMENT_TEAM = TG68TFXG88;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record meeting audio locally on this Mac.";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -418,7 +417,7 @@
 				CODE_SIGNING_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = 48P276DZDB;
+				DEVELOPMENT_TEAM = TG68TFXG88;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record meeting audio locally on this Mac.";
 				LD_RUNPATH_SEARCH_PATHS = (

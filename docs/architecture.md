@@ -197,6 +197,61 @@ Recommended foreign keys:
 - `topics.capture_session_id`
 - `utterances.capture_session_id`
 
+## Authentication model
+
+### Current state: guest login
+
+The login flow is currently hard-coded to a single guest account.
+
+When the locked screen is shown, the user taps "ゲストとして利用を開始". This
+creates an `AccessSession` with `authenticationMethod: .guest` and the bootstrap
+account (displayName: "ゲスト"). No credential is checked.
+
+This is intentional for the current prototype phase. It proves the
+`AccessSession` boundary — locked screen, session isolation, and logout reset —
+without requiring real identity infrastructure.
+
+The guest account is the `bootstrapAccount` created by
+`SharedDeviceBootstrapService` during first-run bootstrap. It is stored in
+SQLite and reused on subsequent launches.
+
+### Target state: FeliCa / organizational card login
+
+The intended production authentication method is employee card tap (FeliCa).
+
+Flow:
+```text
+employee touches FeliCa card to device reader
+  -> card ID looked up in organization account directory
+  -> AccessSession created with authenticationMethod: .badge
+  -> operator lands in the active device view
+  -> logout or timeout ends the access session
+```
+
+This requires:
+- a card reader driver or OS NFC integration
+- a local or remotely-synced account directory
+- `OrganizationMembership` lookup to verify the card holder is authorized
+
+Design seam:
+
+`AccessSessionService.beginAccess(deviceID:accountID:authenticationMethod:)` is
+already parameterized by `AuthenticationMethod`. The guest flow and the badge
+flow both call the same service method. Swapping the auth source does not
+require changing `AccessSessionService`, `CaptureSession`, or any downstream
+capture logic.
+
+`AccessSession.AuthenticationMethod` already includes `.badge`, `.sso`, `.pin`,
+and `.qr` as future options. `.guest` replaces the earlier `.localMock` for
+prototype use.
+
+### Deferred
+
+- FeliCa / NFC reader integration
+- organizational account directory sync
+- PIN or QR fallback flows
+- SSO integration
+
 ## Policy model
 
 Shared room privacy depends on policy, not only on UI courtesy.

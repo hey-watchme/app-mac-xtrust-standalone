@@ -9,11 +9,12 @@ public struct AccessSession: Identifiable, Equatable, Sendable {
     }
 
     public enum AuthenticationMethod: String, Codable, Equatable, Sendable {
-        case localMock = "local_mock"
+        case guest
         case badge
         case sso
         case pin
         case qr
+        case localMock = "local_mock"
     }
 
     public let id: UUID

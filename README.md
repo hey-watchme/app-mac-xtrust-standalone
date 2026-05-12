@@ -371,3 +371,4 @@ Use these documents as the source of truth:
 - `docs/architecture.md`
 - `docs/manual-verification.md`
 - `docs/summarization-prompt-design.md`
+- `docs/asr-hallucination-investigation.md` — ASR ハルシネーション比較調査（Moonshine / Whisper の問題点と代替候補）
