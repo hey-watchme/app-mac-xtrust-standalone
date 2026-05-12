@@ -177,7 +177,33 @@ faster-whisper transcribe audio.wav \
   --no_speech_threshold 0.6
 ```
 
-### E. SpeechBrain / ESPNET / k2 系の日本語 CTC モデル
+### E. SenseVoice（sherpa-onnx 経由、実績あり）
+
+- 開発: Alibaba FunAudioLLM
+- アーキテクチャ: CTC ベース（encoder-decoder ではないため hallucination が構造的に起きにくい）
+- 対応言語: 日本語・中国語・英語・韓国語・広東語（多言語）
+- モデル: `sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09`（int8 量子化）
+- **実績**: 同プロジェクトの Android スタンドアロン版（`xtrust/app/android-standalone/`）で
+  sherpa-onnx + SenseVoice を実際に動作させた記録がある（`docs/session-log.md` 参照）
+- Mac 版への移植は `MoonshineSherpaTranscriber` と同じ sherpa-onnx 呼び出しパターンで可能
+- Python 側の変更点: `from_moonshine_v2()` → `from_sense_voice_v2()` への切り替え
+
+```python
+# SenseVoice 用の recognizer 初期化例
+def make_recognizer(model_dir):
+    return sherpa_onnx.OfflineRecognizer.from_sense_voice_v2(
+        model=os.path.join(model_dir, "model.int8.onnx"),
+        tokens=os.path.join(model_dir, "tokens.txt"),
+        language="ja",
+        use_itn=True,
+        num_threads=4,
+    )
+```
+
+- Android 側で確認された問題: CJK 文字間に余分なスペースが入る場合がある
+  → `MoonshineSherpaTranscriber` に実装済みの CJK スペース除去処理（`_CJK_SPACE_RE`）で対応可能
+
+### F. SpeechBrain / ESPNET / k2 系の日本語 CTC モデル
 
 - CTC（Connectionist Temporal Classification）アーキテクチャは encoder-decoder より
   hallucination が起きにくい
@@ -236,16 +262,21 @@ let moonshineTranscriber = MoonshineSherpaTranscriber(
 
 優先順位（提案）:
 
-1. **ReazonSpeech v2 を試験導入する** ← 最有力
-   - CTC アーキテクチャで構造的に hallucination が起きにくい
-   - 日本語学習データ量が最大クラス
-   - `Transcriber` プロトコルへのアダプター実装は過去の実装パターンに従えばよい
+1. **SenseVoice（sherpa-onnx 経由）を Mac 版に移植する** ← 最有力
+   - Android 版ですでに sherpa-onnx + SenseVoice を動作させた実績がある
+   - CTC アーキテクチャで hallucination が構造的に起きにくい
+   - 既存の `MoonshineSherpaTranscriber` とほぼ同じ構造でアダプターを実装できる
+   - CJK スペース除去処理もすでに実装済み
 
-2. **Moonshine に長さ比率後処理を追加して症状を緩和する**
+2. **ReazonSpeech v2 を試験導入する**
+   - 日本語特化・学習データ量が最大クラス
+   - CTC アーキテクチャ（NeMo ベース）
+
+3. **Moonshine に長さ比率後処理を追加して症状を緩和する**
    - 短期的な応急処置として有効
-   - ReazonSpeech 試験と並行して実施可能
+   - SenseVoice 試験と並行して実施可能
 
-3. **faster-whisper + `initial_prompt` を試す**
+4. **faster-whisper + `initial_prompt` を試す**
    - Whisper の定型句問題を initial_prompt で抑制できるか検証する
 
 ---
