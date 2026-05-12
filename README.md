@@ -371,4 +371,5 @@ Use these documents as the source of truth:
 - `docs/architecture.md`
 - `docs/manual-verification.md`
 - `docs/summarization-prompt-design.md`
-- `docs/asr-hallucination-investigation.md` — ASR ハルシネーション比較調査（Moonshine / Whisper の問題点と代替候補）
+- `docs/asr-comparison-summary.md` — ASR 比較サマリー（Whisper / SenseVoice / Moonshine の現状、調査依頼用）
+- `docs/asr-hallucination-investigation.md` — ASR ハルシネーション詳細調査（根本原因と代替候補）
