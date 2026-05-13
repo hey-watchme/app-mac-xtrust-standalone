@@ -19,16 +19,26 @@ struct SessionListView: View {
                             set: { appState.selectSession($0) }
                         ),
                         isShowingSettings: appState.isShowingSettings,
+                        isShowingChat: appState.isShowingChat,
+                        isMeetingsSectionExpanded: appState.isMeetingsSectionExpanded,
                         activeAccountName: appState.activeAccessAccountDisplayName,
                         onNewSession: { appState.createSession() },
                         onShowSettings: { appState.showSettings() },
+                        onShowChat: { appState.showChat() },
+                        onToggleMeetings: {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                appState.isMeetingsSectionExpanded.toggle()
+                            }
+                        },
                         onLogout: { appState.logoutActiveAccess() }
                     )
                     .navigationSplitViewColumnWidth(
                         min: 200, ideal: XT.Layout.sidebarWidth, max: 320
                     )
                 } detail: {
-                    if appState.isShowingSettings {
+                    if appState.isShowingChat {
+                        ChatView(appState: appState)
+                    } else if appState.isShowingSettings {
                         SettingsView(
                             diagnostics: appState.diagnostics,
                             sessionCount: appState.sessions.count,
@@ -82,34 +92,40 @@ private struct SidebarView: View {
     let sessions: [Session]
     @Binding var selectedSessionID: Session.ID?
     let isShowingSettings: Bool
+    let isShowingChat: Bool
+    let isMeetingsSectionExpanded: Bool
     let activeAccountName: String?
     let onNewSession: () -> Void
     let onShowSettings: () -> Void
+    let onShowChat: () -> Void
+    let onToggleMeetings: () -> Void
     let onLogout: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             sidebarHeader
+            Divider().padding(.horizontal, XT.S.md)
 
-            Divider()
-                .padding(.horizontal, XT.S.md)
-
-            newSessionListButton
-
-            Divider()
-                .padding(.horizontal, XT.S.md)
-
-            if sessions.isEmpty {
-                sidebarEmpty
-            } else {
-                sidebarList
+            ScrollView {
+                VStack(spacing: 0) {
+                    meetingsSectionHeader
+                    if isMeetingsSectionExpanded {
+                        newSessionButton
+                        if sessions.isEmpty {
+                            sidebarEmpty
+                        } else {
+                            sessionsList
+                        }
+                    }
+                    Divider()
+                        .padding(.horizontal, XT.S.md)
+                        .padding(.vertical, XT.S.xs)
+                    chatRow
+                }
             }
 
             Spacer(minLength: 0)
-
-            Divider()
-                .padding(.horizontal, XT.S.md)
-
+            Divider().padding(.horizontal, XT.S.md)
             footerMenu
         }
     }
@@ -122,7 +138,6 @@ private struct SidebarView: View {
                 XTrustLogoView()
                 Spacer()
             }
-
             HStack {
                 Text(activeAccountName.map { "使用中: \($0)" } ?? "使用中")
                     .font(XT.F.caption)
@@ -134,9 +149,31 @@ private struct SidebarView: View {
         .padding(.vertical, XT.S.md)
     }
 
-    // MARK: New Session List Button
+    // MARK: Meetings Section Header
 
-    private var newSessionListButton: some View {
+    private var meetingsSectionHeader: some View {
+        Button(action: onToggleMeetings) {
+            HStack(spacing: XT.S.xs) {
+                Image(systemName: isMeetingsSectionExpanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(XT.C.textTertiary)
+                    .frame(width: 12)
+                Text("会議")
+                    .font(XT.F.sectionLabel)
+                    .foregroundStyle(XT.C.textSecondary)
+                    .textCase(.uppercase)
+                Spacer()
+            }
+            .padding(.horizontal, XT.S.lg)
+            .padding(.vertical, XT.S.sm)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: New Session Button
+
+    private var newSessionButton: some View {
         Button(action: onNewSession) {
             HStack(spacing: XT.S.sm) {
                 Image(systemName: "plus.circle.fill")
@@ -158,23 +195,21 @@ private struct SidebarView: View {
 
     // MARK: Session List
 
-    private var sidebarList: some View {
-        ScrollView {
-            LazyVStack(spacing: 1) {
-                ForEach(sessions) { session in
-                    SidebarSessionRow(
-                        session: session,
-                        isSelected: selectedSessionID == session.id
-                    ) {
-                        withAnimation(.easeInOut(duration: 0.12)) {
-                            selectedSessionID = session.id
-                        }
+    private var sessionsList: some View {
+        LazyVStack(spacing: 1) {
+            ForEach(sessions) { session in
+                SidebarSessionRow(
+                    session: session,
+                    isSelected: selectedSessionID == session.id
+                ) {
+                    withAnimation(.easeInOut(duration: 0.12)) {
+                        selectedSessionID = session.id
                     }
                 }
             }
-            .padding(.vertical, XT.S.sm)
-            .padding(.horizontal, XT.S.sm)
         }
+        .padding(.vertical, XT.S.xs)
+        .padding(.horizontal, XT.S.sm)
     }
 
     // MARK: Empty State
@@ -182,7 +217,7 @@ private struct SidebarView: View {
     private var sidebarEmpty: some View {
         VStack(spacing: XT.S.sm) {
             Image(systemName: "waveform.badge.microphone")
-                .font(.system(size: 28))
+                .font(.system(size: 24))
                 .foregroundStyle(XT.C.textTertiary)
                 .symbolRenderingMode(.hierarchical)
             Text("まだセッションがありません")
@@ -191,34 +226,51 @@ private struct SidebarView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, XT.S.xxxl)
+        .padding(.vertical, XT.S.xxl)
+    }
+
+    // MARK: Chat Row
+
+    private var chatRow: some View {
+        Button(action: onShowChat) {
+            HStack(spacing: XT.S.sm) {
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(isShowingChat ? XT.C.textPrimary : XT.C.accent)
+                Text("チャット")
+                    .font(XT.F.sidebarItem)
+                    .foregroundStyle(XT.C.textPrimary)
+                Spacer()
+            }
+            .padding(.horizontal, XT.S.lg)
+            .frame(height: 40)
+            .background(
+                RoundedRectangle(cornerRadius: XT.R.sm)
+                    .fill(isShowingChat ? XT.C.selectedBG : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, XT.S.sm)
     }
 
     // MARK: Footer
 
     private var footerMenu: some View {
         VStack(spacing: 0) {
-            logoutButton
-            settingsButton
+            sidebarFooterButton(
+                title: "退出",
+                systemImage: "rectangle.portrait.and.arrow.right",
+                isSelected: false,
+                action: onLogout
+            )
+            sidebarFooterButton(
+                title: "Settings",
+                systemImage: "gearshape",
+                isSelected: isShowingSettings,
+                action: onShowSettings
+            )
         }
-    }
-
-    private var logoutButton: some View {
-        sidebarFooterButton(
-            title: "退出",
-            systemImage: "rectangle.portrait.and.arrow.right",
-            isSelected: false,
-            action: onLogout
-        )
-    }
-
-    private var settingsButton: some View {
-        sidebarFooterButton(
-            title: "Settings",
-            systemImage: "gearshape",
-            isSelected: isShowingSettings,
-            action: onShowSettings
-        )
     }
 
     private func sidebarFooterButton(

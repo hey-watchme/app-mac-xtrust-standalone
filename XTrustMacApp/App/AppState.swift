@@ -25,6 +25,7 @@ final class AppState: ObservableObject {
     let transcriptionJobRunner: TranscriptionJobRunner
     let topicSummaryRunner: TopicSummaryRunner
     let captureRuntime: CaptureRuntime
+    let mlxChatRunner: MLXChatRunner
     private var transcriptionRefreshTask: Task<Void, Never>?
     private var summaryRefreshTask: Task<Void, Never>?
     private var summaryQueueTailTask: Task<Void, Never>?
@@ -33,6 +34,10 @@ final class AppState: ObservableObject {
     private var visibleSessionIDs: Set<UUID>
     @Published var activeAccessSession: AccessSession?
     @Published var isShowingSettings: Bool
+    @Published var isShowingChat: Bool
+    @Published var isMeetingsSectionExpanded: Bool
+    @Published var chatMessages: [ChatMessage]
+    @Published var isChatLoading: Bool
     @Published var selectedSessionID: Session.ID?
     @Published var activePlaybackFilePath: String?
     @Published var sessions: [Session]
@@ -63,8 +68,13 @@ final class AppState: ObservableObject {
             transcriptionJobRunner: runtime.transcriptionJobRunner,
             topicSummaryRunner: runtime.topicSummaryRunner,
             captureRuntime: runtime.captureRuntime,
+            mlxChatRunner: runtime.mlxChatRunner,
             activeAccessSession: runtime.initialAccessSession,
             isShowingSettings: false,
+            isShowingChat: false,
+            isMeetingsSectionExpanded: true,
+            chatMessages: [],
+            isChatLoading: false,
             selectedSessionID: runtime.initialSessions.first?.id,
             activePlaybackFilePath: nil,
             recoveredStaleSummaryCount: runtime.initialRecoveredStaleSummaryCount,
@@ -94,8 +104,13 @@ final class AppState: ObservableObject {
         transcriptionJobRunner: TranscriptionJobRunner,
         topicSummaryRunner: TopicSummaryRunner,
         captureRuntime: CaptureRuntime,
+        mlxChatRunner: MLXChatRunner,
         activeAccessSession: AccessSession?,
         isShowingSettings: Bool,
+        isShowingChat: Bool,
+        isMeetingsSectionExpanded: Bool,
+        chatMessages: [ChatMessage],
+        isChatLoading: Bool,
         selectedSessionID: Session.ID?,
         activePlaybackFilePath: String?,
         recoveredStaleSummaryCount: Int,
@@ -120,8 +135,13 @@ final class AppState: ObservableObject {
         self.transcriptionJobRunner = transcriptionJobRunner
         self.topicSummaryRunner = topicSummaryRunner
         self.captureRuntime = captureRuntime
+        self.mlxChatRunner = mlxChatRunner
         self.activeAccessSession = activeAccessSession
         self.isShowingSettings = isShowingSettings
+        self.isShowingChat = isShowingChat
+        self.isMeetingsSectionExpanded = isMeetingsSectionExpanded
+        self.chatMessages = chatMessages
+        self.isChatLoading = isChatLoading
         self.selectedSessionID = selectedSessionID
         self.activePlaybackFilePath = activePlaybackFilePath
         self.recoveredStaleSummaryCount = recoveredStaleSummaryCount
@@ -465,6 +485,7 @@ final class AppState: ObservableObject {
             )
             activeAccessSession = session
             isShowingSettings = false
+            isShowingChat = false
             visibleSessionIDs = []
             sessions = []
             selectedSessionID = nil
@@ -486,6 +507,7 @@ final class AppState: ObservableObject {
             _ = try accessSessionService.endAccess(activeAccessSession, status: .loggedOut)
             self.activeAccessSession = nil
             isShowingSettings = false
+            isShowingChat = false
             visibleSessionIDs = []
             sessions = []
             selectedSessionID = nil
@@ -502,6 +524,7 @@ final class AppState: ObservableObject {
 
     func selectSession(_ sessionID: Session.ID?) {
         isShowingSettings = false
+        isShowingChat = false
         selectedSessionID = sessionID
         meetingSummaryText = nil
         refreshSelectedSessionDetail()
@@ -509,9 +532,35 @@ final class AppState: ObservableObject {
 
     func showSettings() {
         isShowingSettings = true
+        isShowingChat = false
         selectedSessionID = nil
         meetingSummaryText = nil
         refreshSelectedSessionDetail()
+    }
+
+    func showChat() {
+        isShowingSettings = false
+        isShowingChat = true
+        selectedSessionID = nil
+        meetingSummaryText = nil
+        refreshSelectedSessionDetail()
+    }
+
+    func sendChatMessage(_ text: String) {
+        let userMessage = ChatMessage(role: .user, text: text)
+        chatMessages.append(userMessage)
+        isChatLoading = true
+        let snapshot = chatMessages
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let reply = try await mlxChatRunner.chat(messages: snapshot)
+                self.chatMessages.append(ChatMessage(role: .assistant, text: reply))
+            } catch {
+                self.errorMessage = error.localizedDescription
+            }
+            self.isChatLoading = false
+        }
     }
 
     func recoverStaleSummaries() {
@@ -635,6 +684,21 @@ struct SessionDetailSnapshot {
     let session: Session
     let topics: [Topic]
     let utterances: [UtteranceDetailSnapshot]
+}
+
+struct ChatMessage: Identifiable, Sendable {
+    enum Role: Sendable { case user, assistant }
+    let id: UUID
+    let role: Role
+    let text: String
+    let createdAt: Date
+
+    init(role: Role, text: String) {
+        self.id = UUID()
+        self.role = role
+        self.text = text
+        self.createdAt = Date()
+    }
 }
 
 struct UtteranceDetailSnapshot: Identifiable {

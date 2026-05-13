@@ -7,7 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0BD973FCADDBD01C7D34F587 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79490AA925997F059CDEBA0E /* ChatView.swift */; };
 		1AC8780F48A0B10DF35C0647 /* MLXSummarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3244AF913524D3AE9012DE /* MLXSummarizer.swift */; };
+		B9A91712B3636C32A3AF90CE /* MLXChatRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C37CEC710934FD713F77C78 /* MLXChatRunner.swift */; };
 		1FA48225782CC8ABBA9C452C /* AudioPlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA322B047B4588EAC739AAC5 /* AudioPlaybackController.swift */; };
 		3A3FF778EAB67D5BB2F2BAF9 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 543D897CB093CF85ACFB0C15 /* AppState.swift */; };
 		42154AEA24A9331017A0E85E /* MicrophoneRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC877D5F1F438AFC5A5F45AC /* MicrophoneRecorder.swift */; };
@@ -35,6 +37,8 @@
 		19EAA66F29F08A3D78813E77 /* logo_xtrust_black.svg */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = logo_xtrust_black.svg; sourceTree = "<group>"; };
 		1B717838272D4016CA9091B5 /* CopyableDetailRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyableDetailRow.swift; sourceTree = "<group>"; };
 		2B3244AF913524D3AE9012DE /* MLXSummarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLXSummarizer.swift; sourceTree = "<group>"; };
+		2C37CEC710934FD713F77C78 /* MLXChatRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLXChatRunner.swift; sourceTree = "<group>"; };
+		79490AA925997F059CDEBA0E /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		3556079B74CE405811406122 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		3BFEC83FD81FE76DA1667151 /* SessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListView.swift; sourceTree = "<group>"; };
 		43DB9155B0668067122FED0D /* .gitkeep */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitkeep; sourceTree = "<group>"; };
@@ -155,6 +159,7 @@
 				A7DE1C97B77E3ECEF1B85438 /* MemoryPressureMonitor.swift */,
 				EC877D5F1F438AFC5A5F45AC /* MicrophoneRecorder.swift */,
 				2B3244AF913524D3AE9012DE /* MLXSummarizer.swift */,
+				2C37CEC710934FD713F77C78 /* MLXChatRunner.swift */,
 				6432B9AEAE14BE6F8FDE43A8 /* WhisperTranscriber.swift */,
 				B7CAE61CA8D4E50413A3EDF7 /* XTrustComponents.swift */,
 				E584EAA8B416D632F343D32B /* XTrustTheme.swift */,
@@ -162,10 +167,19 @@
 			path = Shared;
 			sourceTree = "<group>";
 		};
+		89B21C29B666DA6B2D03210D /* Chat */ = {
+			isa = PBXGroup;
+			children = (
+				79490AA925997F059CDEBA0E /* ChatView.swift */,
+			);
+			path = Chat;
+			sourceTree = "<group>";
+		};
 		FF533CEA055599CD04C2F2DC /* Features */ = {
 			isa = PBXGroup;
 			children = (
 				43DB9155B0668067122FED0D /* .gitkeep */,
+				89B21C29B666DA6B2D03210D /* Chat */,
 				732B56C6EDD12B5CA3380717 /* Sessions */,
 				802EA95E83A195DB47680E13 /* Settings */,
 			);
@@ -249,6 +263,7 @@
 			files = (
 				B14F16B0C1FECD7144E2360E /* AVAudioCaptureController.swift in Sources */,
 				CF8906C4E9E105CE115CA3A5 /* AppDelegate.swift in Sources */,
+				0BD973FCADDBD01C7D34F587 /* ChatView.swift in Sources */,
 				67930E7B9AA67AC250C7ED7E /* AppDiagnostics.swift in Sources */,
 				C50C6FD5BB908566CD52FB47 /* AppRuntime.swift in Sources */,
 				3A3FF778EAB67D5BB2F2BAF9 /* AppState.swift in Sources */,
@@ -256,6 +271,7 @@
 				A3F17FB9D470216B2E545CA9 /* CopyableDetailRow.swift in Sources */,
 				91A9FABEC61732FA26E32687 /* DiagnosticsView.swift in Sources */,
 				1AC8780F48A0B10DF35C0647 /* MLXSummarizer.swift in Sources */,
+				B9A91712B3636C32A3AF90CE /* MLXChatRunner.swift in Sources */,
 				5F0DC3397F7CADBAD1D6DB3A /* MemoryPressureMonitor.swift in Sources */,
 				42154AEA24A9331017A0E85E /* MicrophoneRecorder.swift in Sources */,
 				B187579E2D50942C02920D13 /* SessionDetailView.swift in Sources */,

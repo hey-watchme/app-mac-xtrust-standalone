@@ -17,6 +17,7 @@ struct AppRuntime {
     let pressureMonitor: MemoryPressureMonitor
     let gemmaSummarizer: MLXSummarizer
     let summarySummarizer: any Summarizer
+    let mlxChatRunner: MLXChatRunner
     let transcriptionJobRunner: TranscriptionJobRunner
     let topicSummaryRunner: TopicSummaryRunner
     let captureRuntime: CaptureRuntime
@@ -41,6 +42,7 @@ struct AppRuntime {
         pressureMonitor.start()
         let gemmaSummarizer = MLXSummarizer(configuration: gemmaConfiguration, pressureMonitor: pressureMonitor)
         let summarySummarizer = SerializedSummarizer(base: gemmaSummarizer)
+        let mlxChatRunner = MLXChatRunner(configuration: gemmaConfiguration)
         let sessionStore = SQLiteSessionStore(databaseURL: paths.database)
         try sessionStore.initialize()
         let staleSummaryRecoveryService = StaleSummaryRecoveryService(
@@ -118,6 +120,7 @@ struct AppRuntime {
             pressureMonitor: pressureMonitor,
             gemmaSummarizer: gemmaSummarizer,
             summarySummarizer: summarySummarizer,
+            mlxChatRunner: mlxChatRunner,
             transcriptionJobRunner: transcriptionJobRunner,
             topicSummaryRunner: topicSummaryRunner,
             captureRuntime: captureRuntime,

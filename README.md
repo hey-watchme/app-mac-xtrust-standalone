@@ -282,6 +282,13 @@ Implemented so far:
   startup
 - `Settings` now includes a self-service `Reset Stuck Summaries` maintenance
   action
+- left sidebar restructured into a collapsible **会議** section (session list)
+  and a **チャット** top-level item
+- `MLXChatRunner` adapter — freeform local chat backed by the same Gemma 4 E4B
+  model via `mlx_vlm generate`; conversation history is accumulated in-memory
+  and sent as context on each turn
+- `ChatView` — conversational chat UI with per-role message bubbles, animated
+  typing indicator, and auto-scroll to latest message
 
 Current verification of the completed PoC slice:
 
@@ -290,9 +297,11 @@ Current verification of the completed PoC slice:
 - `xcodebuild -project XTrustMacApp.xcodeproj -scheme XTrustMacApp build`
 - manual flow: locked screen -> begin local access -> inspect `Settings` ->
   create session -> start VAD capture -> speak -> silence 3s -> utterance
-  created -> transcribe locally (Whisper) -> summarize topic locally (Gemma 4
+  created -> transcribe locally (Moonshine) -> summarize topic locally (Gemma 4
   E4B via MLX) -> close session -> copy wrap-up -> logout -> return to locked
   screen
+- chat flow: begin local access -> select **チャット** in sidebar -> type a
+  message -> receive reply from Gemma 4 E4B running locally
 - recovery flow: force-stop during summary -> relaunch -> confirm stale running
   summaries are auto-recovered or can be reset from `Settings`
 
@@ -349,21 +358,22 @@ direct local-path error instead of attempting a network download.
 
 ## Recommended next step
 
-The vertical path through Milestone 7 is complete end-to-end.
+The chat feature provides a general-purpose local LLM interface alongside the
+meeting workflow.
 
-The most concrete next candidates are:
+Concrete next candidates:
 
-- multimodal expansion: whiteboard capture via MLX vision input
-- meeting ASR / multimodal experiments using Gemma 4 audio-capable tooling
-- optional cleanup: inline microphone permission handling into
-  `AVAudioCaptureController` and remove `MicrophoneRecorder`
+- image upload in the chat panel — drag-and-drop or file picker, passed as
+  base64 to `mlx_vlm generate` for vision input (whiteboard capture use case)
+- `Session` → `CaptureSession` rename (Milestone 11)
+- idle-timeout handling for the shared-device access session (Milestone 10
+  remainder)
 
 Current project state should be read as:
 
-- Milestones 0-7: complete for the PoC
-- Milestone 8: partially satisfied by the current SQLite schema and stable IDs
-- Milestone 9: partially satisfied by retryable jobs, diagnostics, and restart
-  persistence; longer-run hardening remains open
+- Milestones 0-10: complete or partially complete
+- Milestone 11: open (`Session` → `CaptureSession` rename)
+- Chat feature: implemented as a standalone panel outside the milestone sequence
 
 Use these documents as the source of truth:
 
