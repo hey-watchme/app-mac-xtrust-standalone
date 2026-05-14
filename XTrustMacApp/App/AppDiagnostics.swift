@@ -19,6 +19,7 @@ struct AppDiagnostics {
     let gemmaModelReady: Bool
     let databaseReady: Bool
     let recordingActive: Bool
+    let mlxServerStatus: MLXModelServerStatus?
 
     init(
         paths: WorkspacePaths,
@@ -29,7 +30,8 @@ struct AppDiagnostics {
         fileManager: FileManager = .default,
         recordingActive: Bool = false,
         moonshineConfiguration: MoonshineSherpaTranscriberConfiguration,
-        mlxConfiguration: MLXSummarizerConfiguration
+        mlxConfiguration: MLXSummarizerConfiguration,
+        mlxServerStatus: MLXModelServerStatus? = nil
     ) {
         self.workspaceRoot = paths.root
         self.databaseURL = paths.database
@@ -48,5 +50,6 @@ struct AppDiagnostics {
         self.gemmaModelReady = mlxConfiguration.modelReady
         self.databaseReady = fileManager.fileExists(atPath: paths.database.path(percentEncoded: false))
         self.recordingActive = recordingActive
+        self.mlxServerStatus = mlxServerStatus
     }
 }

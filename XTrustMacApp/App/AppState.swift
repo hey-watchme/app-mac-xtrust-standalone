@@ -26,12 +26,14 @@ final class AppState: ObservableObject {
     let topicSummaryRunner: TopicSummaryRunner
     let captureRuntime: CaptureRuntime
     let mlxChatRunner: MLXChatRunner
+    let mlxModelServer: MLXModelServer
     private var transcriptionRefreshTask: Task<Void, Never>?
     private var summaryRefreshTask: Task<Void, Never>?
     private var summaryQueueTailTask: Task<Void, Never>?
     private var summaryQueueTailToken: UUID?
     private var recoveredStaleSummaryCount: Int
     private var visibleSessionIDs: Set<UUID>
+    private var lastMlxServerStatus: MLXModelServerStatus?
     @Published var activeAccessSession: AccessSession?
     @Published var isShowingSettings: Bool
     @Published var isShowingChat: Bool
@@ -69,6 +71,7 @@ final class AppState: ObservableObject {
             topicSummaryRunner: runtime.topicSummaryRunner,
             captureRuntime: runtime.captureRuntime,
             mlxChatRunner: runtime.mlxChatRunner,
+            mlxModelServer: runtime.mlxModelServer,
             activeAccessSession: runtime.initialAccessSession,
             isShowingSettings: false,
             isShowingChat: false,
@@ -105,6 +108,7 @@ final class AppState: ObservableObject {
         topicSummaryRunner: TopicSummaryRunner,
         captureRuntime: CaptureRuntime,
         mlxChatRunner: MLXChatRunner,
+        mlxModelServer: MLXModelServer,
         activeAccessSession: AccessSession?,
         isShowingSettings: Bool,
         isShowingChat: Bool,
@@ -136,6 +140,7 @@ final class AppState: ObservableObject {
         self.topicSummaryRunner = topicSummaryRunner
         self.captureRuntime = captureRuntime
         self.mlxChatRunner = mlxChatRunner
+        self.mlxModelServer = mlxModelServer
         self.activeAccessSession = activeAccessSession
         self.isShowingSettings = isShowingSettings
         self.isShowingChat = isShowingChat
@@ -303,8 +308,20 @@ final class AppState: ObservableObject {
             recoveredStaleSummaryCount: recoveredStaleSummaryCount,
             recordingActive: captureRuntime.isCapturing,
             moonshineConfiguration: moonshineTranscriber.configuration,
-            mlxConfiguration: gemmaSummarizer.configuration
+            mlxConfiguration: gemmaSummarizer.configuration,
+            mlxServerStatus: lastMlxServerStatus
         )
+    }
+
+    func refreshMlxServerStatus() async {
+        let status = await mlxModelServer.status()
+        lastMlxServerStatus = status
+        refreshDiagnostics()
+    }
+
+    func stopMlxServer() async {
+        await mlxModelServer.stop()
+        await refreshMlxServerStatus()
     }
 
     private func startTranscriptionRefreshLoop(selecting sessionID: Session.ID) {
@@ -546,8 +563,8 @@ final class AppState: ObservableObject {
         refreshSelectedSessionDetail()
     }
 
-    func sendChatMessage(_ text: String) {
-        let userMessage = ChatMessage(role: .user, text: text)
+    func sendChatMessage(_ text: String, imagePath: String? = nil, attachedFileName: String? = nil, attachedTextContent: String? = nil) {
+        let userMessage = ChatMessage(role: .user, text: text, imagePath: imagePath, attachedFileName: attachedFileName, attachedTextContent: attachedTextContent)
         chatMessages.append(userMessage)
         isChatLoading = true
         let snapshot = chatMessages
@@ -691,12 +708,18 @@ struct ChatMessage: Identifiable, Sendable {
     let id: UUID
     let role: Role
     let text: String
+    let imagePath: String?
+    let attachedFileName: String?
+    let attachedTextContent: String?
     let createdAt: Date
 
-    init(role: Role, text: String) {
+    init(role: Role, text: String, imagePath: String? = nil, attachedFileName: String? = nil, attachedTextContent: String? = nil) {
         self.id = UUID()
         self.role = role
         self.text = text
+        self.imagePath = imagePath
+        self.attachedFileName = attachedFileName
+        self.attachedTextContent = attachedTextContent
         self.createdAt = Date()
     }
 }

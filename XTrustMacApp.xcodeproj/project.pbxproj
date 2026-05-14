@@ -16,6 +16,7 @@
 		5092AB5E55FC98CC3405D0C0 /* XTrustTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E584EAA8B416D632F343D32B /* XTrustTheme.swift */; };
 		55F615E295737644A740FAC8 /* XTrustMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A49548DD7BC0427330E618 /* XTrustMacApp.swift */; };
 		5F0DC3397F7CADBAD1D6DB3A /* MemoryPressureMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7DE1C97B77E3ECEF1B85438 /* MemoryPressureMonitor.swift */; };
+		D7F1A2E3C4B5061728394A5B /* MLXModelServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F1A2D3C4B5061728394A5B /* MLXModelServer.swift */; };
 		67930E7B9AA67AC250C7ED7E /* AppDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A262A19F49CB88682E84D0E /* AppDiagnostics.swift */; };
 		79B9BA207CF3562ABB74B287 /* SessionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BFEC83FD81FE76DA1667151 /* SessionListView.swift */; };
 		91A9FABEC61732FA26E32687 /* DiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C87E0546F37CE687A12C03E5 /* DiagnosticsView.swift */; };
@@ -50,6 +51,7 @@
 		9A262A19F49CB88682E84D0E /* AppDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiagnostics.swift; sourceTree = "<group>"; };
 		A039DEEAD8BA719205DF34E6 /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
 		A7DE1C97B77E3ECEF1B85438 /* MemoryPressureMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryPressureMonitor.swift; sourceTree = "<group>"; };
+		E8F1A2D3C4B5061728394A5B /* MLXModelServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLXModelServer.swift; sourceTree = "<group>"; };
 		AA322B047B4588EAC739AAC5 /* AudioPlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaybackController.swift; sourceTree = "<group>"; };
 		B7CAE61CA8D4E50413A3EDF7 /* XTrustComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XTrustComponents.swift; sourceTree = "<group>"; };
 		BD590FC1C81A0DA1FA3DCB16 /* AVAudioCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVAudioCaptureController.swift; sourceTree = "<group>"; };
@@ -160,6 +162,7 @@
 				EC877D5F1F438AFC5A5F45AC /* MicrophoneRecorder.swift */,
 				2B3244AF913524D3AE9012DE /* MLXSummarizer.swift */,
 				2C37CEC710934FD713F77C78 /* MLXChatRunner.swift */,
+				E8F1A2D3C4B5061728394A5B /* MLXModelServer.swift */,
 				6432B9AEAE14BE6F8FDE43A8 /* WhisperTranscriber.swift */,
 				B7CAE61CA8D4E50413A3EDF7 /* XTrustComponents.swift */,
 				E584EAA8B416D632F343D32B /* XTrustTheme.swift */,
@@ -272,6 +275,7 @@
 				91A9FABEC61732FA26E32687 /* DiagnosticsView.swift in Sources */,
 				1AC8780F48A0B10DF35C0647 /* MLXSummarizer.swift in Sources */,
 				B9A91712B3636C32A3AF90CE /* MLXChatRunner.swift in Sources */,
+				D7F1A2E3C4B5061728394A5B /* MLXModelServer.swift in Sources */,
 				5F0DC3397F7CADBAD1D6DB3A /* MemoryPressureMonitor.swift in Sources */,
 				42154AEA24A9331017A0E85E /* MicrophoneRecorder.swift in Sources */,
 				B187579E2D50942C02920D13 /* SessionDetailView.swift in Sources */,

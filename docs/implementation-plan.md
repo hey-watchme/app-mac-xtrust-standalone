@@ -216,42 +216,30 @@ Mitigation:
 - then migrate current `sessions` into `capture_sessions`
 - keep migration steps explicit and testable
 
-## Immediate priority: summary crash prevention
+## Completed runtime safety work
 
-Before Step 5 (CaptureSession rename), the summary pipeline must be unblocked.
-The current static 8 GB memory check prevents all summarization from succeeding
-without making the host Mac safe.
+The summary crash-prevention design (`summary-runtime-safety.md`) has shipped:
+`MemoryPressureMonitor` is in place, `MLXSummarizer` registers its subprocess
+PID with the monitor, and `.critical` memory pressure triggers SIGKILL. The
+static 8 GB pre-flight check has been replaced by a minimal sanity check.
 
-See `summary-runtime-safety.md` for the full design.
+## Completed LLM server residency work
 
-Implementation tasks (in order):
+The LLM execution path has shipped as a long-lived `mlx_vlm.server`
+subprocess shared by both `MLXSummarizer` and `MLXChatRunner` (formerly each
+call spawned its own short-lived `mlx_vlm generate` subprocess). The
+`MLXModelServer` actor in the app target owns the lifecycle: lazy spawn on
+the first request, readiness polling on `GET /health`, idle teardown after
+10 minutes without requests, and restart-on-death. The subprocess PID is
+still registered with `MemoryPressureMonitor`, so the SIGKILL pathway is
+unchanged — only the subprocess lifetime is longer. `AppDiagnostics` and
+`SettingsView` expose the server state for manual inspection.
 
-1. Create `MemoryPressureMonitor` actor in
-   `Packages/AppCore/Sources/AppCore/Application/`
-   - subscribe to `DispatchSource` memory pressure events
-   - kill registered subprocess PIDs on `.critical`
-   - expose pressure level and event history for diagnostics
+The formal architecture is now in `architecture.md` (section
+"Local LLM runtime"). The detailed design, PoC measurements, and
+failure-mode handling are in `llm-server-residency.md`.
 
-2. Update `MLXSummarizer`:
-   - replace `validateMemoryBudget()` with a minimal sanity check
-   - register subprocess PID with `MemoryPressureMonitor` after launch
-   - unregister on subprocess exit
-   - handle `SIGKILL` termination as `killedByMemoryPressure` error
-
-3. Update `MLXSummarizerError`:
-   - add `killedByMemoryPressure(reason: String)`
-   - add `startupBlockedBySystemPressure`
-   - deprecate `insufficientMemory`
-
-4. Update `DiagnosticsView` and `AppDiagnostics`:
-   - show current memory pressure level
-   - show recent kill events
-   - remove "MLX Required Memory" display (static threshold removed)
-
-Acceptance gate: summarization succeeds in normal conditions; Mac does not crash
-under memory pressure.
-
-## Recommended next coding task (after crash prevention)
+## Recommended next coding task
 
 1. rename the current `Session` domain model into `CaptureSession`
 2. migrate SQLite and service boundaries so meeting data belongs to

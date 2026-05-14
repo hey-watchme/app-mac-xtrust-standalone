@@ -58,16 +58,9 @@ struct MLXSummarizerConfiguration: Sendable {
 
 struct MLXSummarizer: Summarizer, Sendable {
     let configuration: MLXSummarizerConfiguration
-    let pressureMonitor: MemoryPressureMonitor?
+    let server: MLXModelServer
 
     var modelIdentifier: String { "gemma-4-e4b-it-4bit" }
-
-    private static let preferredExecutableDirectories: [String] = [
-        "/opt/homebrew/bin",
-        "/usr/local/bin",
-        "/usr/bin",
-        "/bin",
-    ]
 
     func summarize(request: SummarizationRequest) async throws -> String {
         guard configuration.modelReady else {
@@ -76,27 +69,40 @@ struct MLXSummarizer: Summarizer, Sendable {
 
         let prompt = buildPrompt(for: request)
         try validatePromptSize(prompt)
-        try validateSanityCheck()
 
-        let result = try await runProcess(prompt: prompt)
+        let turns = [MLXChatTurn(role: .user, text: prompt)]
 
-        if result.terminationReason == .uncaughtSignal && result.exitCode == SIGKILL {
-            throw MLXSummarizerError.killedByMemoryPressure
-        }
-
-        guard result.exitCode == 0 else {
-            throw MLXSummarizerError.processFailed(
-                exitCode: result.exitCode,
-                stderr: result.standardError ?? "(no stderr)"
+        do {
+            return try await server.chatCompletion(
+                messages: turns,
+                maxTokens: configuration.maxTokens
             )
+        } catch let error as MLXModelServerError {
+            throw map(error)
         }
+    }
 
-        let raw = (result.standardOutput ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !raw.isEmpty else {
-            throw MLXSummarizerError.emptyOutput
+    private func map(_ error: MLXModelServerError) -> MLXSummarizerError {
+        switch error {
+        case let .modelMissing(path):
+            return .modelMissing(expectedPath: path)
+        case .killedByMemoryPressure:
+            return .killedByMemoryPressure
+        case .emptyOutput:
+            return .emptyOutput
+        case let .requestFailed(status, body):
+            return .processFailed(exitCode: Int32(status), stderr: body)
+        case let .responseDecodeFailed(reason):
+            return .processFailed(exitCode: -1, stderr: reason)
+        case let .serverDied(tail):
+            return .processFailed(exitCode: -1, stderr: tail)
+        case let .readinessTimedOut(seconds, tail):
+            return .processFailed(exitCode: -1, stderr: "readiness timed out after \(Int(seconds))s. \(tail)")
+        case let .spawnFailed(reason):
+            return .processFailed(exitCode: -1, stderr: "spawn failed: \(reason)")
+        case .portAllocationFailed:
+            return .processFailed(exitCode: -1, stderr: "port allocation failed")
         }
-
-        return parseOutput(raw)
     }
 
     private func buildPrompt(for request: SummarizationRequest) -> String {
@@ -179,19 +185,6 @@ struct MLXSummarizer: Summarizer, Sendable {
         }
     }
 
-    // Blocks only on extreme conditions (< 500 MB free) where attempting
-    // the subprocess would almost certainly fail immediately.
-    // Normal memory management is handled by MemoryPressureMonitor at runtime.
-    private func validateSanityCheck() throws {
-        guard let snapshot = try? SystemMemorySnapshot.capture() else { return }
-        let minimumBytes: UInt64 = 512 * 1_024 * 1_024
-        guard snapshot.availableBytes >= minimumBytes else {
-            throw MLXSummarizerError.startupBlockedBySystemPressure(
-                availableBytes: snapshot.availableBytes
-            )
-        }
-    }
-
     private func contextDescription(for profile: Session.MeetingContextProfile) -> String {
         switch profile {
         case .general:
@@ -233,122 +226,6 @@ struct MLXSummarizer: Summarizer, Sendable {
             """
         }
     }
-
-    // mlx_vlm generate output format:
-    // ==========
-    // Files: []
-    //
-    // Prompt: <bos><|turn>user\n...<turn|>\n<|turn>model\n\n<generated text>
-    // ==========
-    // Prompt: X tokens, ...
-    // Generation: X tokens, ...
-    // Peak memory: X.XX GB
-    //
-    // Extract the generated text by finding the last <|turn>model marker and taking
-    // everything after it up to the closing separator.
-    private func parseOutput(_ raw: String) -> String {
-        let separatorPrefix = "=========="
-        let modelTurnMarker = "<|turn>model"
-        let lines = raw.components(separatedBy: "\n")
-
-        var separatorIndices: [Int] = []
-        for (i, line) in lines.enumerated() {
-            if line.hasPrefix(separatorPrefix) {
-                separatorIndices.append(i)
-            }
-        }
-
-        if separatorIndices.count >= 2 {
-            let blockLines = Array(lines[(separatorIndices[0] + 1)..<separatorIndices[1]])
-            let block = blockLines.joined(separator: "\n")
-            if let markerRange = block.range(of: modelTurnMarker, options: .backwards) {
-                let afterMarker = String(block[markerRange.upperBound...])
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                if !afterMarker.isEmpty {
-                    return afterMarker
-                }
-            }
-            // No model turn marker found — return the whole block stripped of noise
-            return blockLines
-                .filter { !$0.hasPrefix("Files:") && !$0.hasPrefix("Prompt:") }
-                .joined(separator: "\n")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        // No separators — strip known stats lines as fallback
-        let filtered = lines.filter { line in
-            guard !line.hasPrefix(separatorPrefix) else { return false }
-            let prefixes = ["Prompt:", "Generation:", "Peak memory:", "Fetching", "Files:"]
-            return !prefixes.contains(where: { line.hasPrefix($0) })
-        }
-        return filtered.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func runProcess(prompt: String) async throws -> SummaryProcessResult {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: configuration.pythonExecutablePath)
-        process.arguments = [
-            "-m", "mlx_vlm", "generate",
-            "--model", configuration.modelDirectory,
-            "--prompt", prompt,
-            "--max-tokens", String(configuration.maxTokens),
-        ]
-        process.environment = buildProcessEnvironment()
-
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        try process.run()
-
-        let pid = process.processIdentifier
-        pressureMonitor?.register(pid: pid, label: "mlx_vlm summarizer")
-
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                process.waitUntilExit()
-                self.pressureMonitor?.unregister(pid: pid)
-                let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                continuation.resume(returning: SummaryProcessResult(
-                    exitCode: process.terminationStatus,
-                    terminationReason: process.terminationReason,
-                    standardOutput: String(data: stdoutData, encoding: .utf8)?
-                        .trimmingCharacters(in: .whitespacesAndNewlines),
-                    standardError: String(data: stderrData, encoding: .utf8)?
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                ))
-            }
-        }
-    }
-
-    private func buildProcessEnvironment() -> [String: String] {
-        var environment = ProcessInfo.processInfo.environment
-        let currentPathEntries = (environment["PATH"] ?? "")
-            .split(separator: ":")
-            .map(String.init)
-
-        let pythonDirectory = URL(fileURLWithPath: configuration.pythonExecutablePath)
-            .deletingLastPathComponent()
-            .path(percentEncoded: false)
-
-        var mergedEntries: [String] = []
-        for entry in currentPathEntries + [pythonDirectory] + Self.preferredExecutableDirectories {
-            guard !entry.isEmpty, !mergedEntries.contains(entry) else { continue }
-            mergedEntries.append(entry)
-        }
-
-        environment["PATH"] = mergedEntries.joined(separator: ":")
-        return environment
-    }
-}
-
-private struct SummaryProcessResult: Sendable {
-    let exitCode: Int32
-    let terminationReason: Process.TerminationReason
-    let standardOutput: String?
-    let standardError: String?
 }
 
 enum MLXSummarizerError: LocalizedError {
@@ -357,26 +234,19 @@ enum MLXSummarizerError: LocalizedError {
     case emptyOutput
     case promptTooLarge(limit: Int, actual: Int)
     case killedByMemoryPressure
-    case startupBlockedBySystemPressure(availableBytes: UInt64)
-    case memoryProbeFailed(message: String)
 
     var errorDescription: String? {
         switch self {
         case let .modelMissing(path):
             return "Gemma 4 MLX model missing. Place gemma4-mlx/ at: \(path)"
         case let .processFailed(exitCode, stderr):
-            return "mlx_lm.generate exited with code \(exitCode). stderr: \(stderr)"
+            return "mlx_vlm.server request failed (code \(exitCode)). detail: \(stderr)"
         case .emptyOutput:
-            return "mlx_lm.generate produced no output."
+            return "mlx_vlm.server returned no output."
         case let .promptTooLarge(limit, actual):
             return "要約入力が大きすぎるため実行を中止しました。Prompt size: \(actual) chars. Limit: \(limit) chars."
         case .killedByMemoryPressure:
             return "システムのメモリ圧迫が critical に達したため、要約プロセスを停止しました。しばらくしてから再試行してください。"
-        case let .startupBlockedBySystemPressure(availableBytes):
-            let formatted = ByteCountFormatter.string(fromByteCount: Int64(availableBytes), countStyle: .memory)
-            return "空きメモリが極小 (\(formatted)) のため要約を開始できません。他のアプリを終了してから再試行してください。"
-        case let .memoryProbeFailed(message):
-            return "メモリ状態を確認できないため要約を開始しませんでした。\(message)"
         }
     }
 }
@@ -389,7 +259,9 @@ struct SystemMemorySnapshot: Sendable {
 
         var pageSize: vm_size_t = 0
         guard host_page_size(host, &pageSize) == KERN_SUCCESS else {
-            throw MLXSummarizerError.memoryProbeFailed(message: "host_page_size failed")
+            throw NSError(domain: "SystemMemorySnapshot", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "host_page_size failed"
+            ])
         }
 
         var vmStats = vm_statistics64()
@@ -402,7 +274,9 @@ struct SystemMemorySnapshot: Sendable {
         }
 
         guard result == KERN_SUCCESS else {
-            throw MLXSummarizerError.memoryProbeFailed(message: "host_statistics64 failed: \(result)")
+            throw NSError(domain: "SystemMemorySnapshot", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "host_statistics64 failed: \(result)"
+            ])
         }
 
         let availablePageCount =

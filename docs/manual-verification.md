@@ -75,6 +75,71 @@ Steps:
 
 Pass: logout resets the shared UI and returns to the locked screen.
 
+### Check 2.4 — MLX Server residency lifecycle
+
+Date added: 2026-05-15
+
+Goal: confirm that the local LLM (`mlx_vlm.server`) runs as a long-lived
+subprocess that is reused across summary / chat calls, auto-stops when idle,
+and restarts cleanly after an external kill or memory-pressure shutdown.
+
+Background: subprocess isolation is still required (see
+`summary-runtime-safety.md`). This check verifies the new lifecycle only.
+
+Steps:
+
+1. Launch the app. Press `利用を開始`. Open `Settings`.
+2. In the `Diagnostics` card, confirm the `MLX Server` section is visible.
+   Initial state should be:
+   - `State: Stopped`
+   - `PID: —`
+   - `Port: —`
+3. Create a session and trigger any summary (or send one chat message). Within
+   60 s, observe `MLX Server` transitions:
+   - `State: Starting` → `State: Running`
+   - `PID` is populated (a positive integer)
+   - `Port` is populated (e.g. an ephemeral port in the 49152–65535 range)
+   - `Uptime` starts counting from 0
+4. Run a second summary or chat call within 10 minutes. Confirm:
+   - `PID` is unchanged
+   - `Port` is unchanged
+   - `Uptime` keeps increasing (it is not reset)
+   - `Last Request` updates to `just now` / a small number of seconds
+5. From a terminal, externally kill the server:
+   ```
+   kill -9 <pid shown in Settings>
+   ```
+   Trigger another summary / chat call. Confirm:
+   - The first call after the kill may briefly surface an error (server died)
+   - The very next call shows the server restarted with a **new** PID and a
+     new Port
+   - `Uptime` resets to a small value
+6. Press `Stop MLX Server` in the `MLX Server Control` card. Confirm:
+   - `State: Stopped`
+   - `PID` and `Port` become `—`
+   - No `mlx_vlm.server` process remains under
+     `ps aux | grep mlx_vlm.server`
+7. Idle teardown: leave the app open with no summary / chat activity for
+   slightly over the configured idle timeout (default 10 minutes). Confirm:
+   - `MLX Server` returns to `State: Stopped`
+   - No `mlx_vlm.server` process remains
+8. (Optional, requires `stress-ng`) Force memory pressure during inference:
+   ```
+   stress-ng --vm 4 --vm-bytes 12G --timeout 30s
+   ```
+   While stress is active, trigger a summary. Confirm:
+   - `MemoryPressureMonitor` sends SIGKILL to the registered PID
+   - `MLX Server` flips to `State: Killed` with `Last Error` mentioning
+     memory pressure
+   - The host Mac remains responsive
+   - A subsequent summary call after stress ends spawns a fresh server
+
+Pass: the model process is reused across requests, idle-stops automatically,
+restarts after kill, and surfaces memory-pressure kills as a distinct state
+without taking down the host.
+
+---
+
 ### Check 2.5 — Stuck summary recovery is self-service
 
 Goal: confirm stale running summaries do not require DB edits or developer

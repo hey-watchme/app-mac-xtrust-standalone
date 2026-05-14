@@ -8,6 +8,8 @@ struct SettingsView: View {
     let maintenanceMessage: String?
     let isSummaryQueueBusy: Bool
     let onRecoverStaleSummaries: () -> Void
+    let onRefreshMlxServerStatus: () async -> Void
+    let onStopMlxServer: () async -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,6 +22,7 @@ struct SettingsView: View {
                     accountCard
                     maintenanceCard
                     diagnosticsCard
+                    mlxServerControlCard
                 }
                 .padding(XT.Layout.contentPadding)
                 .frame(maxWidth: XT.Layout.contentMaxWidth)
@@ -27,6 +30,46 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
+        .task {
+            while !Task.isCancelled {
+                await onRefreshMlxServerStatus()
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
+    }
+
+    private var mlxServerControlCard: some View {
+        XTCard {
+            VStack(alignment: .leading, spacing: XT.S.lg) {
+                XTSectionLabel(text: "MLX Server Control")
+
+                Text("ローカル LLM (mlx_vlm.server) を常駐プロセスとして起動・再利用します。アイドルが \(idleTimeoutMinutes) 分続くと自動停止します。")
+                    .font(XT.F.caption)
+                    .foregroundStyle(XT.C.textSecondary)
+
+                Button(action: {
+                    Task { await onStopMlxServer() }
+                }) {
+                    Label("Stop MLX Server", systemImage: "stop.circle")
+                }
+                .buttonStyle(XTSecondaryButtonStyle())
+                .disabled(!isMlxServerRunnable)
+            }
+            .padding(XT.S.xl)
+        }
+    }
+
+    private var idleTimeoutMinutes: Int {
+        guard let status = diagnostics.mlxServerStatus else { return 10 }
+        return max(1, Int(status.idleTimeout / 60))
+    }
+
+    private var isMlxServerRunnable: Bool {
+        guard let status = diagnostics.mlxServerStatus else { return false }
+        switch status.state {
+        case .running, .starting: return true
+        case .stopped, .killed, .failed: return false
+        }
     }
 
     private var header: some View {

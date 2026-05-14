@@ -314,6 +314,56 @@ The detailed crash-prevention architecture (multi-layer defense with
 `DispatchSource` memory pressure monitoring and subprocess kill) is documented
 separately in `summary-runtime-safety.md`.
 
+## Local LLM runtime
+
+Both `MLXSummarizer` (topic and meeting summarization) and `MLXChatRunner`
+(general chat) share one local LLM execution path. The execution model is a
+long-lived subprocess that holds the model resident in Unified Memory across
+many requests.
+
+```text
+[SwiftUI app process]
+  │
+  │  spawns + owns + can SIGKILL
+  ▼
+[python3 -m mlx_vlm.server]  ─ 127.0.0.1:<ephemeral port>
+  │  OpenAI-compatible /v1/chat/completions
+  │  model resident in Metal / Unified Memory
+  │
+[MLXSummarizer]   [MLXChatRunner]   ── HTTP POST ─┘
+```
+
+Rules:
+
+- the LLM never runs in-process; it always runs as a subprocess so the parent
+  app can SIGKILL it under memory pressure
+- one server instance is shared by both the summarizer and the chat runner
+- the server is spawned lazily on the first request, not at app startup
+- the server outlives individual requests; the model is loaded once and
+  reused across many calls
+- after a configurable idle window (default 10 minutes), the server is
+  terminated to release Unified Memory back to the rest of the device
+- the subprocess PID is registered with `MemoryPressureMonitor`; OS-level
+  `.critical` memory pressure SIGKILLs the server, and the next request
+  triggers a fresh spawn
+- if the subprocess dies for any reason (external kill, crash, OOM kill),
+  the next request observes the dead connection and respawns transparently
+
+The `MLXModelServer` actor in the app target owns this lifecycle (spawn,
+readiness polling on `GET /health`, idle timer, restart-on-death). The
+`MLXSummarizer` and `MLXChatRunner` types are thin call sites that build
+their own prompts and call one shared `chatCompletion(messages:maxTokens:)`
+method on the controller.
+
+`AppDiagnostics` exposes the current server state (Stopped / Starting /
+Running / Killed / Failed), PID, ephemeral port, uptime, last request time,
+and last error message.
+
+The detailed design, PoC measurements, and failure-mode handling are
+documented separately in `llm-server-residency.md`. The crash-prevention
+subprocess-kill design (independent of subprocess lifetime) remains in
+`summary-runtime-safety.md`.
+
 ## Security and privacy boundaries
 
 ### UI boundary

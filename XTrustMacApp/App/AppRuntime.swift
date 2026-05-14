@@ -15,6 +15,7 @@ struct AppRuntime {
     let audioPlaybackController: AudioPlaybackController
     let moonshineTranscriber: MoonshineSherpaTranscriber
     let pressureMonitor: MemoryPressureMonitor
+    let mlxModelServer: MLXModelServer
     let gemmaSummarizer: MLXSummarizer
     let summarySummarizer: any Summarizer
     let mlxChatRunner: MLXChatRunner
@@ -40,9 +41,17 @@ struct AppRuntime {
         )
         let pressureMonitor = MemoryPressureMonitor()
         pressureMonitor.start()
-        let gemmaSummarizer = MLXSummarizer(configuration: gemmaConfiguration, pressureMonitor: pressureMonitor)
+        let serverConfiguration = MLXModelServerConfiguration(
+            pythonExecutablePath: gemmaConfiguration.pythonExecutablePath,
+            modelDirectory: gemmaConfiguration.modelDirectory
+        )
+        let mlxModelServer = MLXModelServer(
+            configuration: serverConfiguration,
+            pressureMonitor: pressureMonitor
+        )
+        let gemmaSummarizer = MLXSummarizer(configuration: gemmaConfiguration, server: mlxModelServer)
         let summarySummarizer = SerializedSummarizer(base: gemmaSummarizer)
-        let mlxChatRunner = MLXChatRunner(configuration: gemmaConfiguration)
+        let mlxChatRunner = MLXChatRunner(configuration: gemmaConfiguration, server: mlxModelServer)
         let sessionStore = SQLiteSessionStore(databaseURL: paths.database)
         try sessionStore.initialize()
         let staleSummaryRecoveryService = StaleSummaryRecoveryService(
@@ -118,6 +127,7 @@ struct AppRuntime {
             audioPlaybackController: audioPlaybackController,
             moonshineTranscriber: moonshineTranscriber,
             pressureMonitor: pressureMonitor,
+            mlxModelServer: mlxModelServer,
             gemmaSummarizer: gemmaSummarizer,
             summarySummarizer: summarySummarizer,
             mlxChatRunner: mlxChatRunner,

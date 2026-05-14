@@ -45,7 +45,9 @@ struct SessionListView: View {
                             errorMessage: appState.errorMessage,
                             maintenanceMessage: appState.maintenanceMessage,
                             isSummaryQueueBusy: appState.isSummaryQueueBusy,
-                            onRecoverStaleSummaries: { appState.recoverStaleSummaries() }
+                            onRecoverStaleSummaries: { appState.recoverStaleSummaries() },
+                            onRefreshMlxServerStatus: { await appState.refreshMlxServerStatus() },
+                            onStopMlxServer: { await appState.stopMlxServer() }
                         )
                     } else {
                         SessionDetailView(

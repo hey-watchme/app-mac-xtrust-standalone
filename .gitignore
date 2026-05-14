@@ -16,3 +16,6 @@ Package.resolved
 models/
 artifacts/
 tmp/
+
+# Editor settings
+.vscode/

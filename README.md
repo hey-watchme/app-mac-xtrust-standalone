@@ -356,6 +356,48 @@ Diagnostics keys: `Gemma 4 Model` / `Gemma 4 Model Ready`
 If either model file is missing, the corresponding feature will fail with a
 direct local-path error instead of attempting a network download.
 
+## Investigation log
+
+### MTP (Multi-Token Prediction) drafter — 2026-05-14
+
+Google released MTP drafters for the Gemma 4 family on 2026-05-05, claiming up to 3x speedup via
+speculative decoding. We investigated whether this could be integrated into the current stack.
+
+**What was tried**
+
+- `mlx_vlm 0.5.0` already supports `--draft-model`, `--draft-kind mtp`, and `--draft-block-size`
+  in the CLI — no stack change required at the API level.
+- Downloaded `mlx-community/gemma-4-E4B-it-assistant-bf16` (183 MB, 4-layer MTP head).
+- Benchmarked against the current `gemma4-mlx` (4-bit quantized target) on M1 Pro 16 GB.
+
+**Benchmark results (128-token generation, temperature 0)**
+
+| Configuration | Generation | Accepted tokens/round | Wall time |
+|---|---|---|---|
+| 4-bit target, no drafter | — | — | 17.1 s |
+| 4-bit target + bf16 drafter, block-size 2 | 24.9 t/s | 0.21 | 19.0 s |
+| 4-bit target + bf16 drafter, block-size 3 | 19.5 t/s | 0.27 | 20.2 s |
+| 4-bit target + bf16 drafter, block-size 4 | 15.4 t/s | 0.28 | 21.7 s |
+
+**Root cause**
+
+The MTP drafter is a 4-layer head that reads the target model's hidden states (dim 2560) directly.
+It was trained against bf16 hidden states. When the target is 4-bit quantized the hidden state
+distribution drifts enough that almost all draft predictions are rejected, producing a net slowdown.
+The published drafter models are bf16-only; no 4-bit drafter for E4B is currently available.
+
+**Conclusion**
+
+MTP is not viable on the current hardware/model combination:
+
+- bf16 target would require ~14–16 GB weights — not feasible on a 16 GB M1 Pro.
+- 8-bit target (~9.7 GB) is worth retesting if acceptance rate improves to ≥ 1.5/round.
+- The full 3× gain requires a 32 GB+ machine or a dedicated 4-bit-trained drafter.
+
+No Swift code was changed. The drafter model was deleted after testing.
+
+---
+
 ## Recommended next step
 
 The chat feature provides a general-purpose local LLM interface alongside the
