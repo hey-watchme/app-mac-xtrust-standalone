@@ -22,6 +22,7 @@ final class AppModel {
     var isShowingSettings = false
     var isShowingChat = false
     var isMeetingsSectionExpanded = true
+    var isInspectorVisible = true
     var chatMessages: [ChatMessage] = []
     var isChatLoading = false
     var sessions: [CaptureSession] = []
@@ -212,6 +213,10 @@ final class AppModel {
     func showChat() {
         isShowingSettings = false
         isShowingChat = true
+    }
+
+    func toggleInspector() {
+        isInspectorVisible.toggle()
     }
 
     // MARK: - Chat

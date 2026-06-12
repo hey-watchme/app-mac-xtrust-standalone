@@ -8,6 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		0BD973FCADDBD01C7D34F587 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79490AA925997F059CDEBA0E /* ChatView.swift */; };
+		A1B2C3D4E5F67890AB12CD3E /* WorkspaceRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2D3C4B5A678901234ABCD /* WorkspaceRail.swift */; };
+		B2C3D4E5F6A789012345BCDE /* SlackSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = G2F3E4D5C6B78901234567EF /* SlackSidebar.swift */; };
+		C3D4E5F6A7B890123456CDEF /* AIInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = H3G4F5E6D7C8901234567890 /* AIInspector.swift */; };
+		D4E5F6A7B8C901234567DEF0 /* SlackMeetingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = I4H5G6F7E8D9012345678901 /* SlackMeetingView.swift */; };
 		1AC8780F48A0B10DF35C0647 /* MLXSummarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3244AF913524D3AE9012DE /* MLXSummarizer.swift */; };
 		B9A91712B3636C32A3AF90CE /* MLXChatRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C37CEC710934FD713F77C78 /* MLXChatRunner.swift */; };
 		1FA48225782CC8ABBA9C452C /* AudioPlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA322B047B4588EAC739AAC5 /* AudioPlaybackController.swift */; };
@@ -69,6 +73,10 @@
 		D3211A8FB80887592033D556 /* .gitkeep */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitkeep; sourceTree = "<group>"; };
 		E584EAA8B416D632F343D32B /* XTrustTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XTrustTheme.swift; sourceTree = "<group>"; };
 		ED547DCBCF6CC917E2B8427E /* XTrustMacApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XTrustMacApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F1E2D3C4B5A678901234ABCD /* WorkspaceRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceRail.swift; sourceTree = "<group>"; };
+		G2F3E4D5C6B78901234567EF /* SlackSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackSidebar.swift; sourceTree = "<group>"; };
+		H3G4F5E6D7C8901234567890 /* AIInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIInspector.swift; sourceTree = "<group>"; };
+		I4H5G6F7E8D9012345678901 /* SlackMeetingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackMeetingView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -205,8 +213,20 @@
 				89B21C29B666DA6B2D03210D /* Chat */,
 				AD636F7848CBC488B4AA7E88 /* Meetings */,
 				802EA95E83A195DB47680E13 /* Settings */,
+				J5K6L7M8N9O0123456789012 /* Shell */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		J5K6L7M8N9O0123456789012 /* Shell */ = {
+			isa = PBXGroup;
+			children = (
+				F1E2D3C4B5A678901234ABCD /* WorkspaceRail.swift */,
+				G2F3E4D5C6B78901234567EF /* SlackSidebar.swift */,
+				H3G4F5E6D7C8901234567890 /* AIInspector.swift */,
+				I4H5G6F7E8D9012345678901 /* SlackMeetingView.swift */,
+			);
+			path = Shell;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -285,7 +305,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				CF8906C4E9E105CE115CA3A5 /* AppDelegate.swift in Sources */,
+				C3D4E5F6A7B890123456CDEF /* AIInspector.swift in Sources */,
 				0BD973FCADDBD01C7D34F587 /* ChatView.swift in Sources */,
+				B2C3D4E5F6A789012345BCDE /* SlackSidebar.swift in Sources */,
+				D4E5F6A7B8C901234567DEF0 /* SlackMeetingView.swift in Sources */,
+				A1B2C3D4E5F67890AB12CD3E /* WorkspaceRail.swift in Sources */,
 				67930E7B9AA67AC250C7ED7E /* AppDiagnostics.swift in Sources */,
 				2F03BEDB543E04FACFF80C7E /* AppModel.swift in Sources */,
 				C50C6FD5BB908566CD52FB47 /* AppRuntime.swift in Sources */,
