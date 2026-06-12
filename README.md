@@ -1,54 +1,39 @@
 # Mac Local-First Ambient Memo
 
-Date: 2026-05-10 JST
+Date: 2026-06-12 JST
 
 This directory contains a standalone macOS local-first ambient memo product
 line that is independent from WatchMe / ZeroTouch cloud infrastructure.
 
 ## Current status
 
-This project has completed the first end-to-end local meeting notes PoC
-vertical slice through the original Milestone 7:
+The realtime meeting-transcription core has been rebuilt (2026-06):
+
+- ASR now uses Apple `SpeechAnalyzer` / `SpeechTranscriber` — the macOS 26
+  on-device streaming speech API (ja-JP) — producing live volatile partial
+  results and finalized utterances. The previous Python ASR stack (Whisper /
+  Moonshine via sherpa-onnx, per-utterance wav files, subprocess
+  `TranscriptionJob` pipeline, RMS-threshold VAD) has been deleted.
+- The domain root is `CaptureSession` (Milestone 11 complete). `Topic`,
+  `TranscriptionJob`, and per-utterance recording/transcript artifacts are
+  retired. `Utterance` carries transcribed text and time offsets directly,
+  and each capture session records one wav file (`audio/<id>.wav`).
+- Closing a meeting generates one Japanese meeting-minutes document
+  (`MeetingMinutes`) with Gemma 4 E4B via a long-lived local
+  `mlx_vlm.server`.
+- The shared-device foundation remains: organization-owned,
+  workspace-scoped, device-centered, short-lived operator access,
+  privacy-safe between meetings (`Organization` / `Workspace` / `Device` /
+  `Account` / `OrganizationMembership` / `AccessSession`).
+- Local SQLite persistence is at schema v2 (`PRAGMA user_version`); legacy
+  capture tables were dropped destructively in this rebuild.
+- Deployment target is macOS 26 (built with Xcode 26.5).
+
+Project layout:
 
 - a real macOS Xcode project at `XTrustMacApp.xcodeproj`
 - a native `SwiftUI` app target at `XTrustMacApp/`
 - a testable core library as a local package at `Packages/AppCore/`
-- local SQLite persistence for sessions, utterances, topics, jobs, and summary
-  state
-- end-to-end capture -> transcription -> topic summary -> session wrap-up
-- baseline unit and integration tests for workspace bootstrap, persistence, and
-  job flows
-
-The next phase is a structural redesign.
-
-The product is now being reframed as a shared room device:
-
-- organization-owned
-- workspace-scoped
-- device-centered
-- short-lived operator access
-- privacy-safe between meetings
-
-This means the current `Session`-centric model is no longer sufficient by
-itself. The upcoming redesign introduces:
-
-- `Organization`
-- `Workspace`
-- `Device`
-- `Account`
-- `OrganizationMembership`
-- `AccessSession`
-- `CaptureSession`
-
-Implemented in the redesign so far:
-
-- SQLite root tables for `Organization`, `Workspace`, `Device`, `Account`,
-  `OrganizationMembership`, and `AccessSession`
-- default local shared-device bootstrap for development
-- diagnostics exposure for current organization / workspace / device scope
-- persistent `AccessSession` service with local mock login and logout
-- locked room-device start screen when no active access session exists
-- `Settings` view in the left sidebar for shared-device metadata inspection
 
 Technical stack and implementation planning are tracked in:
 
@@ -153,9 +138,10 @@ Microphone input
   -> local session save
 ```
 
-The redesign now intentionally revisits earlier assumptions. In particular:
+The redesign intentionally revisited earlier assumptions. In particular:
 
-- the old `Session` concept is being split
+- the old `Session` concept has been split into `AccessSession` and
+  `CaptureSession`
 - the app is no longer treated as a personal single-operator tool
 - shared-device privacy and retention are now core product behavior
 
@@ -180,7 +166,7 @@ The original PoC did not yet include:
 ## Success criteria
 
 - Japanese meeting audio can be transcribed at practical speed on the target Mac
-- local wrap-up quality is strong enough for meeting-note review
+- local meeting-minutes quality is strong enough for meeting-note review
 - the app remains stable during normal meeting-length operation
 - on-device results are available during the active meeting flow
 - prior meeting content is not casually visible to the next room user
@@ -215,95 +201,46 @@ mac-local-first/
 
 ## Current implementation status
 
-Implemented so far:
+Core meeting flow (implemented and working):
 
-- app launch from `XTrustMacApp.xcodeproj`
-- local workspace bootstrap under `~/Library/Application Support/XTrust/com.xtrust.mac-local-first/`
-- local SQLite session store
-- `New Session` creation and relaunch persistence
-- microphone recording to local `wav`
-- local playback of recorded audio
-- first successful local transcription confirmed end-to-end from the app UI
-- explicit startup and runtime error surfacing without fallback workspace
-- initial `recording artifact`, `transcription job`, and `transcript artifact`
-  domain contracts in `AppCore`
-- persisted `TranscriptionJob` runner backed by isolated
-  `jobs/transcription/<job_id>/` workspaces
-- Whisper execution moved behind `AppCore` ports instead of the direct UI path
-- durable capture of stdout, stderr, exit code, output files, and validation
-  before transcript promotion into final `transcripts/`
-- retryable transcription attempts that create new jobs instead of overwriting
-  prior evidence
-- `Session Detail` UI that shows latest job state, diagnostics paths, and per-
-  utterance job attempt history
-- live UI refresh for `queued`, `running`, `completed`, and `failed`
-  transcription job state
-- VAD-based continuous capture via `CaptureRuntime` / `AVAudioCaptureController`
-  (RMS threshold 0.01, 3-second silence boundary)
-- `utteranceFinalized` events persisted as `Utterance` + `RecordingArtifact` in
-  SQLite
-- `TopicAssignmentService` groups utterances into topics on a 60-second silence
-  gap rule
-- `Summarizer` port and `TopicSummaryRunner` for per-topic local LLM
-  summarization
-- `MLXSummarizer` adapter — calls `python3 -m mlx_vlm generate` as a subprocess
-  with a local model directory under `models/gemma4-mlx/`
-- `Gemma 4 E4B` running locally via MLX / `mlx_vlm`
-  (`mlx-community/gemma-4-e4b-it-4bit`, ~4.86 GB, 4bit); end-to-end Japanese
-  meeting summary confirmed
-- `Session.Status.closed` + `SessionService.closeSession()`
-- per-topic `Summarize` button, summary status badge, and summary text display
-- `Close Session` button and `Copy Wrap-Up` (Markdown to clipboard)
-- Diagnostics screen shows Whisper and Gemma 4 model paths and ready status
-- old one-shot recording path removed from `AppState`; VAD capture is the
-  primary recording flow
-- UI design system (`XT` token namespace, custom components, Ambient Memo concept)
-  — see `docs/design-system.md`
-- root entity persistence for `Organization`, `Workspace`, `Device`, `Account`,
-  and `OrganizationMembership`
-- default local shared-device bootstrap via `SharedDeviceBootstrapService`
-- `AccessSession` domain, SQLite persistence, and `AccessSessionService`
-- locked shared-device screen before local access begins
-- logout path that resets the shared UI and clears visible session history from
-  the current operator flow
-- `Settings` screen available from the left sidebar footer
-- diagnostics now show current organization / workspace / device and access
-  status
-- Whisper invocation hardened against common no-speech / trailing-silence
-  hallucination at utterance boundaries
-- trailing silence is no longer written into finalized utterance wav files
-- empty or no-output transcription results are treated as discarded noise, not
-  as operator-facing failures
-- topic and meeting summarization now run through one serialized queue instead
-  of launching concurrent MLX jobs
-- MLX summarization now rejects oversized prompts and low-memory starts before
-  launching the subprocess
-- stale `summary_status = running` rows are recovered automatically on app
-  startup
-- `Settings` now includes a self-service `Reset Stuck Summaries` maintenance
-  action
-- left sidebar restructured into a collapsible **会議** section (session list)
-  and a **チャット** top-level item
-- `MLXChatRunner` adapter — freeform local chat backed by the same Gemma 4 E4B
-  model via `mlx_vlm generate`; conversation history is accumulated in-memory
-  and sent as context on each turn
-- `ChatView` — conversational chat UI with per-role message bubbles, animated
-  typing indicator, and auto-scroll to latest message
+- locked shared-device screen -> begin local access -> `会議を開始`
+- capture state pill walks through: permission check -> speech asset check /
+  download -> starting -> `録音中`
+- live transcript: a gray volatile (partial) line plus timestamped finalized
+  rows; the UI is event-driven (`AsyncStream<CaptureEngineEvent>` consumed by
+  an `@Observable` `MeetingStore`) with no polling
+- `会議を終了して議事録を作成` -> Gemma 4 E4B (via the long-lived
+  `mlx_vlm.server`) generates Japanese meeting minutes (会議サマリー /
+  決定事項 / 未決事項 / アクションアイテム) -> copy / export as Markdown
+- interrupted minutes generation auto-recovers on relaunch
+  (`running` -> `pending`, then re-run automatically)
+- logout resets the shared UI and returns to the locked screen
 
-Current verification of the completed PoC slice:
+Key components:
 
-- `swift build`
-- `swift test` — 41 tests pass
+- `SpeechAnalyzerCaptureEngine` (app target, `XTrustMacApp/Capture/`):
+  microphone capture, on-device streaming ASR, audio level metering, and one
+  wav file per capture session
+- `AppCore` (local package): domain (`CaptureSession`, `Utterance`,
+  `MeetingMinutes`, shared-device entities) and services
+  (`CaptureSessionService`, `LiveMeetingRecorder`, `MeetingMinutesService`,
+  `MinutesRecoveryService`, `AccessSessionService`), backed by SQLite
+- `MLXModelServer` / `MLXSummarizer` / `MLXChatRunner`: local LLM runtime as
+  a long-lived `mlx_vlm.server` subprocess with idle teardown and
+  memory-pressure kill (see `docs/llm-server-residency.md`)
+- chat panel (**チャット** in the sidebar) backed by the same local Gemma 4
+  E4B model
+- `Diagnostics`: speech asset status (ja-JP supported / installed), Gemma 4
+  model readiness, MLX server state, recovered minutes count, and current
+  organization / workspace / device / access scope
+- UI design system (`XT` token namespace, custom components) — see
+  `docs/design-system.md`
+
+Verification:
+
+- `swift build` and `swift test` at the repository root
 - `xcodebuild -project XTrustMacApp.xcodeproj -scheme XTrustMacApp build`
-- manual flow: locked screen -> begin local access -> inspect `Settings` ->
-  create session -> start VAD capture -> speak -> silence 3s -> utterance
-  created -> transcribe locally (Moonshine) -> summarize topic locally (Gemma 4
-  E4B via MLX) -> close session -> copy wrap-up -> logout -> return to locked
-  screen
-- chat flow: begin local access -> select **チャット** in sidebar -> type a
-  message -> receive reply from Gemma 4 E4B running locally
-- recovery flow: force-stop during summary -> relaunch -> confirm stale running
-  summaries are auto-recovered or can be reset from `Settings`
+- manual checks: see `docs/manual-verification.md`
 
 Open in Xcode:
 
@@ -315,27 +252,27 @@ Note:
 
 - use `XTrustMacApp.xcodeproj` for running the app
 - keep `Package.swift` for command-line build and test workflows only
+- manual verification must use the Xcode-built app: the SPM (`swift run`)
+  binary has no `Info.plist`, so microphone permission behaves differently
 - for stable microphone permission retention, prefer `Signing Certificate:
   Development`; `Sign to Run Locally` may cause repeated permission prompts on
   this app
 
 ## Prerequisites
 
-The app does not download models at runtime. Place both model files before
-first use. Exact paths are shown in the app under `Diagnostics`.
+### ASR (no installation required)
 
-### Whisper (ASR)
+Speech recognition uses the macOS on-device speech model
+(`SpeechAnalyzer` / `SpeechTranscriber`, ja-JP). There is no ASR model file
+to install: the OS downloads the ja-JP speech asset on first use, the app
+shows the download progress in the capture state pill, and `Diagnostics`
+shows the asset status (`Speech Locale Supported` / `Speech Assets
+Installed`). Requires macOS 26.
 
-Install the `whisper` Python package and ensure `ffmpeg` is available in
-`PATH`. Place the model file at:
+### Gemma 4 E4B (local LLM minutes generation and chat)
 
-- `~/Library/Application Support/XTrust/com.xtrust.mac-local-first/models/whisper/small.pt`
-
-Diagnostics keys: `Whisper Model` / `Whisper Model Ready`
-
-### Gemma 4 E4B (local LLM summarization)
-
-Install Apple Silicon native `python3`, `mlx-vlm`, and download the model:
+The app does not download this model at runtime. Install Apple Silicon
+native `python3`, `mlx-vlm`, and download the model before first use:
 
 ```bash
 pip install mlx-lm mlx-vlm
@@ -348,13 +285,14 @@ hf download mlx-community/gemma-4-e4b-it-4bit \
 - the app resolves a local model directory at
   `~/Library/Application Support/XTrust/com.xtrust.mac-local-first/models/gemma4-mlx/`
   rather than a single model file
-- summarization is invoked as `python3 -m mlx_vlm generate ...` from
-  `MLXSummarizer`
+- the model is served by a long-lived `python3 -m mlx_vlm.server` subprocess
+  owned by the app (see `docs/llm-server-residency.md`)
 
-Diagnostics keys: `Gemma 4 Model` / `Gemma 4 Model Ready`
+Diagnostics keys: `Gemma 4 MLX Model` / `Gemma 4 MLX Ready`
 
-If either model file is missing, the corresponding feature will fail with a
-direct local-path error instead of attempting a network download.
+If the Gemma model directory is missing, minutes generation and chat will
+fail with a direct local-path error instead of attempting a network
+download.
 
 ## Investigation log
 
@@ -400,21 +338,22 @@ No Swift code was changed. The drafter model was deleted after testing.
 
 ## Recommended next step
 
-The chat feature provides a general-purpose local LLM interface alongside the
-meeting workflow.
+The realtime pipeline rebuild (SpeechAnalyzer migration + Milestone 11) is
+complete.
 
 Concrete next candidates:
 
-- image upload in the chat panel — drag-and-drop or file picker, passed as
-  base64 to `mlx_vlm generate` for vision input (whiteboard capture use case)
-- `Session` → `CaptureSession` rename (Milestone 11)
 - idle-timeout handling for the shared-device access session (Milestone 10
   remainder)
+- Milestone 12: privacy-safe room flow
+- Milestone 13: retention and purge policy
 
 Current project state should be read as:
 
-- Milestones 0-10: complete or partially complete
-- Milestone 11: open (`Session` → `CaptureSession` rename)
+- Milestones 0-9: complete
+- Milestone 10: partially complete (idle-timeout and real auth adapters open)
+- Milestone 11: complete (`Session` → `CaptureSession`, done as part of the
+  realtime pipeline rebuild)
 - Chat feature: implemented as a standalone panel outside the milestone sequence
 
 Use these documents as the source of truth:
@@ -423,5 +362,9 @@ Use these documents as the source of truth:
 - `docs/architecture.md`
 - `docs/manual-verification.md`
 - `docs/summarization-prompt-design.md`
-- `docs/asr-comparison-summary.md` — ASR 比較サマリー（Whisper / SenseVoice / Moonshine の現状、調査依頼用）
-- `docs/asr-hallucination-investigation.md` — ASR ハルシネーション詳細調査（根本原因と代替候補）
+- `docs/asr-comparison-summary.md` — ASR 比較サマリー（Whisper / SenseVoice / Moonshine の現状、調査依頼用・歴史的記録）
+- `docs/asr-hallucination-investigation.md` — ASR ハルシネーション詳細調査（根本原因と代替候補・歴史的記録）
+
+Note: the ASR hallucination problem documented in the two ASR investigation
+docs was resolved by migrating ASR to Apple `SpeechAnalyzer`; they are kept
+as history.

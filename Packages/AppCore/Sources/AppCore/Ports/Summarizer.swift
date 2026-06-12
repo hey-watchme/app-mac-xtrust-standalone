@@ -2,17 +2,17 @@ import Foundation
 
 public struct SummarizationRequest: Sendable {
     public enum Scope: String, Sendable {
-        case topic
-        case meeting
+        case transcriptChunk
+        case meetingMinutes
     }
 
     public let scope: Scope
-    public let contextProfile: Session.MeetingContextProfile
+    public let contextProfile: MeetingContextProfile
     public let transcripts: [String]
 
     public init(
         scope: Scope,
-        contextProfile: Session.MeetingContextProfile,
+        contextProfile: MeetingContextProfile,
         transcripts: [String]
     ) {
         self.scope = scope

@@ -4,7 +4,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ChatView: View {
-    @ObservedObject var appState: AppState
+    var appState: AppModel
     @State private var inputText: String = ""
     @State private var pendingImageURL: URL?
     @State private var pendingImageDisplayName: String = ""

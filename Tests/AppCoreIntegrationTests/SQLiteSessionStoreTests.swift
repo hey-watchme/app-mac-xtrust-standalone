@@ -4,363 +4,246 @@ import Testing
 
 struct SQLiteSessionStoreTests {
     @Test
-    func insertsAndListsSessions() throws {
-        let tempRoot = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
-        let paths = WorkspacePaths(root: tempRoot)
-        let store = SQLiteSessionStore(databaseURL: paths.database)
-        try store.initialize()
+    func insertsAndListsCaptureSessions() throws {
+        let store = try makeInitializedStore()
+        let fixture = try insertSharedDeviceFixture(store: store)
 
-        let session = Session(
-            id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
-            startedAt: Date(timeIntervalSince1970: 1_700_000_000),
-            status: .draft
+        let older = makeCaptureSession(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000001001")!,
+            fixture: fixture,
+            startedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
-        try store.insertSession(session)
+        let newer = makeCaptureSession(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000001002")!,
+            fixture: fixture,
+            startedAt: Date(timeIntervalSince1970: 1_700_000_100)
+        )
+        try store.insertCaptureSession(older)
+        try store.insertCaptureSession(newer)
 
-        let sessions = try store.listSessions()
+        let sessions = try store.listCaptureSessions()
 
-        #expect(sessions.count == 1)
-        #expect(sessions.first?.id == session.id)
-        #expect(sessions.first?.status == .draft)
-        #expect(sessions.first?.meetingContextProfile == .general)
+        #expect(sessions == [newer, older])
     }
 
     @Test
-    func updatesSessionRecordingMetadata() throws {
-        let tempRoot = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
-        let paths = WorkspacePaths(root: tempRoot)
-        let store = SQLiteSessionStore(databaseURL: paths.database)
-        try store.initialize()
-
-        let sessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
-        try store.insertSession(
-            Session(
-                id: sessionID,
-                startedAt: Date(timeIntervalSince1970: 1_700_000_000),
-                status: .draft
-            )
+    func updatesCaptureSessionLifecycle() throws {
+        let store = try makeInitializedStore()
+        let fixture = try insertSharedDeviceFixture(store: store)
+        let session = makeCaptureSession(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000001011")!,
+            fixture: fixture,
+            startedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
+        try store.insertCaptureSession(session)
 
-        try store.updateSession(
-            Session(
-                id: sessionID,
-                startedAt: Date(timeIntervalSince1970: 1_700_000_000),
-                endedAt: Date(timeIntervalSince1970: 1_700_000_120),
-                status: .completed,
-                audioFilePath: "/tmp/test.wav",
-                durationSeconds: 12.0
+        let recording = session.recordingStarted(audioFilePath: "/tmp/meeting.wav")
+        try store.updateCaptureSession(recording)
+        #expect(try store.listCaptureSessions() == [recording])
+
+        let closed = recording
+            .withMeetingContextProfile(.recruitingHR)
+            .closed(
+                endedAt: Date(timeIntervalSince1970: 1_700_003_600),
+                audioDurationSeconds: 3_600,
+                utteranceCount: 12
             )
-        )
+        try store.updateCaptureSession(closed)
 
-        let sessions = try store.listSessions()
-
-        #expect(sessions.first?.status == .completed)
-        #expect(sessions.first?.audioFilePath == "/tmp/test.wav")
-        #expect(sessions.first?.durationSeconds == 12.0)
+        let listed = try store.listCaptureSessions()
+        #expect(listed == [closed])
+        #expect(listed.first?.status == .closed)
+        #expect(listed.first?.meetingContextProfile == .recruitingHR)
+        #expect(listed.first?.audioDurationSeconds == 3_600)
+        #expect(listed.first?.utteranceCount == 12)
     }
 
     @Test
-    func updatesSessionTranscriptMetadata() throws {
-        let tempRoot = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
-        let paths = WorkspacePaths(root: tempRoot)
-        let store = SQLiteSessionStore(databaseURL: paths.database)
-        try store.initialize()
-
-        let sessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
-        try store.insertSession(
-            Session(
-                id: sessionID,
-                startedAt: Date(timeIntervalSince1970: 1_700_000_000),
-                status: .completed,
-                audioFilePath: "/tmp/test.wav",
-                durationSeconds: 5.0
-            )
+    func insertsAndListsUtterancesOrderedByStartedAt() throws {
+        let store = try makeInitializedStore()
+        let fixture = try insertSharedDeviceFixture(store: store)
+        let session = makeCaptureSession(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000001021")!,
+            fixture: fixture,
+            startedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
+        try store.insertCaptureSession(session)
 
-        try store.updateSession(
-            Session(
-                id: sessionID,
-                startedAt: Date(timeIntervalSince1970: 1_700_000_000),
-                endedAt: Date(timeIntervalSince1970: 1_700_000_005),
-                status: .completed,
-                audioFilePath: "/tmp/test.wav",
-                durationSeconds: 5.0,
-                transcriptText: "こんにちは",
-                transcriptFilePath: "/tmp/test.txt",
-                transcriptionStatus: .completed,
-                transcriptionError: nil,
-                transcriptionDurationSeconds: 2.3
-            )
+        let later = Utterance(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000001022")!,
+            captureSessionID: session.id,
+            startedAt: Date(timeIntervalSince1970: 1_700_000_030),
+            endedAt: Date(timeIntervalSince1970: 1_700_000_034),
+            startOffsetSeconds: 30,
+            endOffsetSeconds: 34,
+            text: "次の議題です",
+            locale: "ja-JP",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_034)
         )
+        let earlier = Utterance(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000001023")!,
+            captureSessionID: session.id,
+            startedAt: Date(timeIntervalSince1970: 1_700_000_005),
+            endedAt: Date(timeIntervalSince1970: 1_700_000_008),
+            startOffsetSeconds: 5,
+            endOffsetSeconds: 8,
+            text: "こんにちは",
+            locale: "ja-JP",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_008)
+        )
+        try store.insertUtterance(later)
+        try store.insertUtterance(earlier)
 
-        let sessions = try store.listSessions()
+        let utterances = try store.listUtterances(captureSessionID: session.id)
 
-        #expect(sessions.first?.transcriptText == "こんにちは")
-        #expect(sessions.first?.transcriptFilePath == "/tmp/test.txt")
-        #expect(sessions.first?.transcriptionStatus == .completed)
-        #expect(sessions.first?.transcriptionDurationSeconds == 2.3)
+        #expect(utterances == [earlier, later])
     }
 
     @Test
-    func persistsMeetingContextProfile() throws {
-        let tempRoot = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
-        let paths = WorkspacePaths(root: tempRoot)
-        let store = SQLiteSessionStore(databaseURL: paths.database)
-        try store.initialize()
-
-        let sessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000004")!
-        try store.insertSession(
-            Session(
-                id: sessionID,
-                startedAt: Date(timeIntervalSince1970: 1_700_000_000),
-                status: .draft,
-                meetingContextProfile: .engineering
-            )
+    func insertsUpdatesAndGetsMeetingMinutes() throws {
+        let store = try makeInitializedStore()
+        let fixture = try insertSharedDeviceFixture(store: store)
+        let session = makeCaptureSession(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000001031")!,
+            fixture: fixture,
+            startedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
+        try store.insertCaptureSession(session)
 
-        let sessions = try store.listSessions()
+        let pending = MeetingMinutes(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000001032")!,
+            captureSessionID: session.id,
+            createdAt: Date(timeIntervalSince1970: 1_700_003_700)
+        )
+        try store.insertMeetingMinutes(pending)
+        #expect(try store.getMeetingMinutes(captureSessionID: session.id) == pending)
+        #expect(try store.getMeetingMinutes(captureSessionID: UUID()) == nil)
 
-        #expect(sessions.first?.meetingContextProfile == .engineering)
+        let completed = pending
+            .running(at: Date(timeIntervalSince1970: 1_700_003_710))
+            .completed(
+                markdownText: "# 議事録",
+                modelIdentifier: "gemma-4-e4b",
+                at: Date(timeIntervalSince1970: 1_700_003_800)
+            )
+        try store.updateMeetingMinutes(completed)
+
+        let fetched = try store.getMeetingMinutes(captureSessionID: session.id)
+        #expect(fetched == completed)
+        #expect(fetched?.markdownText == "# 議事録")
+        #expect(fetched?.modelIdentifier == "gemma-4-e4b")
     }
 
     @Test
-    func insertsAndListsTopicsForSession() throws {
-        let tempRoot = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
-        let paths = WorkspacePaths(root: tempRoot)
-        let store = SQLiteSessionStore(databaseURL: paths.database)
-        try store.initialize()
+    func listsMeetingMinutesFilteredByStatuses() throws {
+        let store = try makeInitializedStore()
+        let fixture = try insertSharedDeviceFixture(store: store)
 
-        let sessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
-        try store.insertSession(
-            Session(
-                id: sessionID,
-                startedAt: Date(timeIntervalSince1970: 1_700_000_000),
-                status: .draft
+        var minutesByStatus: [MeetingMinutes.Status: MeetingMinutes] = [:]
+        let statuses: [MeetingMinutes.Status] = [.pending, .running, .completed, .failed]
+        for (offset, status) in statuses.enumerated() {
+            let session = makeCaptureSession(
+                id: UUID(),
+                fixture: fixture,
+                startedAt: Date(timeIntervalSince1970: 1_700_000_000 + Double(offset))
             )
-        )
+            try store.insertCaptureSession(session)
 
-        let topic = Topic(
-            id: UUID(uuidString: "00000000-0000-0000-0000-000000000102")!,
-            sessionID: sessionID,
-            startedAt: Date(timeIntervalSince1970: 1_700_000_030)
-        )
-        try store.insertTopic(topic)
-
-        let topics = try store.listTopics(sessionID: sessionID)
-
-        #expect(topics == [topic])
-    }
-
-    @Test
-    func insertsAndListsUtterancesForSession() throws {
-        let tempRoot = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
-        let paths = WorkspacePaths(root: tempRoot)
-        let store = SQLiteSessionStore(databaseURL: paths.database)
-        try store.initialize()
-
-        let sessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000201")!
-        let topicID = UUID(uuidString: "00000000-0000-0000-0000-000000000202")!
-        try store.insertSession(
-            Session(
-                id: sessionID,
-                startedAt: Date(timeIntervalSince1970: 1_700_000_000),
-                status: .draft
+            let minutes = MeetingMinutes(
+                captureSessionID: session.id,
+                status: status,
+                markdownText: status == .completed ? "# Done" : nil,
+                errorMessage: status == .failed ? "boom" : nil,
+                createdAt: Date(timeIntervalSince1970: 1_700_004_000 + Double(offset)),
+                startedAt: status == .pending ? nil : Date(timeIntervalSince1970: 1_700_004_100),
+                completedAt: status == .completed || status == .failed
+                    ? Date(timeIntervalSince1970: 1_700_004_200)
+                    : nil
             )
+            try store.insertMeetingMinutes(minutes)
+            minutesByStatus[status] = minutes
+        }
+
+        #expect(try store.listMeetingMinutes(statuses: [.running]) == [minutesByStatus[.running]!])
+        #expect(
+            try store.listMeetingMinutes(statuses: [.pending, .running])
+                == [minutesByStatus[.pending]!, minutesByStatus[.running]!]
         )
-        try store.insertTopic(
-            Topic(
-                id: topicID,
-                sessionID: sessionID,
-                startedAt: Date(timeIntervalSince1970: 1_700_000_020)
-            )
-        )
-
-        let utterance = Utterance(
-            id: UUID(uuidString: "00000000-0000-0000-0000-000000000203")!,
-            sessionID: sessionID,
-            topicID: topicID,
-            startedAt: Date(timeIntervalSince1970: 1_700_000_021),
-            endedAt: Date(timeIntervalSince1970: 1_700_000_028),
-            durationSeconds: 7,
-            audioFilePath: "/tmp/utt.wav"
-        )
-        try store.insertUtterance(utterance)
-
-        let utterances = try store.listUtterances(sessionID: sessionID)
-
-        #expect(utterances == [utterance])
-    }
-
-    @Test
-    func insertsAndListsRecordingArtifactsForUtterance() throws {
-        let tempRoot = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
-        let paths = WorkspacePaths(root: tempRoot)
-        let store = SQLiteSessionStore(databaseURL: paths.database)
-        try store.initialize()
-
-        let utteranceID = try insertSessionAndUtterance(store: store)
-        let artifact = RecordingArtifactMetadata(
-            id: UUID(uuidString: "00000000-0000-0000-0000-000000000601")!,
-            utteranceID: utteranceID,
-            filePath: "/tmp/utt.wav",
-            byteSize: 4_096,
-            durationSeconds: 3.2,
-            sampleRate: 16_000,
-            channelCount: 1,
-            createdAt: Date(timeIntervalSince1970: 1_700_000_100)
-        )
-        try store.insertRecordingArtifact(artifact)
-
-        let artifacts = try store.listRecordingArtifacts(utteranceID: utteranceID)
-
-        #expect(artifacts == [artifact])
-    }
-
-    @Test
-    func insertsAndListsTranscriptionJobsForUtterance() throws {
-        let tempRoot = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
-        let paths = WorkspacePaths(root: tempRoot)
-        let store = SQLiteSessionStore(databaseURL: paths.database)
-        try store.initialize()
-
-        let utteranceID = try insertSessionAndUtterance(store: store)
-        let recordingArtifactID = UUID(uuidString: "00000000-0000-0000-0000-000000000701")!
-        try store.insertRecordingArtifact(
-            RecordingArtifactMetadata(
-                id: recordingArtifactID,
-                utteranceID: utteranceID,
-                filePath: "/tmp/input.wav",
-                byteSize: 8_192,
-                durationSeconds: 6.4,
-                sampleRate: 16_000,
-                channelCount: 1,
-                createdAt: Date(timeIntervalSince1970: 1_700_000_100)
-            )
-        )
-        let job = TranscriptionJob(
-            id: UUID(uuidString: "00000000-0000-0000-0000-000000000702")!,
-            utteranceID: utteranceID,
-            recordingArtifactID: recordingArtifactID,
-            workingDirectoryPath: "/tmp/jobs/702",
-            command: "whisper",
-            arguments: ["input.wav", "--output_format", "txt"],
-            modelIdentifier: "small",
-            language: "ja",
-            status: .completed,
-            createdAt: Date(timeIntervalSince1970: 1_700_000_110),
-            startedAt: Date(timeIntervalSince1970: 1_700_000_111),
-            endedAt: Date(timeIntervalSince1970: 1_700_000_120),
-            stdoutFilePath: "/tmp/jobs/702/stdout.txt",
-            stderrFilePath: "/tmp/jobs/702/stderr.txt",
-            exitCode: 0,
-            outputFileNames: ["input.txt"],
-            failureMessage: nil
-        )
-        try store.insertTranscriptionJob(job)
-
-        let jobs = try store.listTranscriptionJobs(utteranceID: utteranceID)
-
-        #expect(jobs == [job])
-    }
-
-    @Test
-    func insertsAndListsTranscriptArtifactsForUtterance() throws {
-        let tempRoot = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
-        let paths = WorkspacePaths(root: tempRoot)
-        let store = SQLiteSessionStore(databaseURL: paths.database)
-        try store.initialize()
-
-        let utteranceID = try insertSessionAndUtterance(store: store)
-        let recordingArtifactID = UUID(uuidString: "00000000-0000-0000-0000-000000000801")!
-        let transcriptionJobID = UUID(uuidString: "00000000-0000-0000-0000-000000000802")!
-        try store.insertRecordingArtifact(
-            RecordingArtifactMetadata(
-                id: recordingArtifactID,
-                utteranceID: utteranceID,
-                filePath: "/tmp/input.wav",
-                byteSize: 1_024,
-                durationSeconds: 1.1,
-                sampleRate: 16_000,
-                channelCount: 1,
-                createdAt: Date(timeIntervalSince1970: 1_700_000_100)
-            )
-        )
-        try store.insertTranscriptionJob(
-            TranscriptionJob(
-                id: transcriptionJobID,
-                utteranceID: utteranceID,
-                recordingArtifactID: recordingArtifactID,
-                workingDirectoryPath: "/tmp/jobs/802",
-                command: "whisper",
-                arguments: ["input.wav"],
-                modelIdentifier: "small",
-                language: "ja",
-                status: .completed,
-                createdAt: Date(timeIntervalSince1970: 1_700_000_110),
-                startedAt: Date(timeIntervalSince1970: 1_700_000_111),
-                endedAt: Date(timeIntervalSince1970: 1_700_000_120),
-                stdoutFilePath: "/tmp/jobs/802/stdout.txt",
-                stderrFilePath: "/tmp/jobs/802/stderr.txt",
-                exitCode: 0,
-                outputFileNames: ["input.txt"],
-                failureMessage: nil
-            )
-        )
-        let artifact = TranscriptArtifactMetadata(
-            id: UUID(uuidString: "00000000-0000-0000-0000-000000000803")!,
-            utteranceID: utteranceID,
-            transcriptionJobID: transcriptionJobID,
-            filePath: "/tmp/input.txt",
-            text: "hello",
-            modelIdentifier: "small",
-            language: "ja",
-            createdAt: Date(timeIntervalSince1970: 1_700_000_121)
-        )
-        try store.insertTranscriptArtifact(artifact)
-
-        let artifacts = try store.listTranscriptArtifacts(utteranceID: utteranceID)
-
-        #expect(artifacts == [artifact])
+        #expect(try store.listMeetingMinutes(statuses: []).isEmpty)
+        #expect(try store.listMeetingMinutes(statuses: statuses).count == 4)
     }
 }
 
-private func insertSessionAndUtterance(store: SQLiteSessionStore) throws -> UUID {
-    let sessionID = UUID(uuidString: "00000000-0000-0000-0000-000000000900")!
-    let utteranceID = UUID(uuidString: "00000000-0000-0000-0000-000000000901")!
-    try store.insertSession(
-        Session(
-            id: sessionID,
-            startedAt: Date(timeIntervalSince1970: 1_700_000_000),
-            status: .draft
-        )
+struct SharedDeviceFixture {
+    let organization: Organization
+    let workspace: Workspace
+    let device: Device
+    let account: Account
+    let accessSession: AccessSession
+}
+
+func makeInitializedStore() throws -> SQLiteSessionStore {
+    let tempRoot = FileManager.default.temporaryDirectory
+        .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+    let paths = WorkspacePaths(root: tempRoot)
+    let store = SQLiteSessionStore(databaseURL: paths.database)
+    try store.initialize()
+    return store
+}
+
+func insertSharedDeviceFixture(store: SQLiteSessionStore) throws -> SharedDeviceFixture {
+    let createdAt = Date(timeIntervalSince1970: 1_699_999_000)
+    let organization = Organization(name: "Org", createdAt: createdAt)
+    let workspace = Workspace(
+        organizationID: organization.id,
+        name: "Workspace",
+        createdAt: createdAt.addingTimeInterval(1)
     )
-    try store.insertUtterance(
-        Utterance(
-            id: utteranceID,
-            sessionID: sessionID,
-            startedAt: Date(timeIntervalSince1970: 1_700_000_001),
-            endedAt: Date(timeIntervalSince1970: 1_700_000_004),
-            durationSeconds: 3,
-            audioFilePath: "/tmp/utt.wav"
-        )
+    let device = Device(
+        organizationID: organization.id,
+        workspaceID: workspace.id,
+        displayName: "Device",
+        createdAt: createdAt.addingTimeInterval(2)
     )
-    return utteranceID
+    let account = Account(
+        displayName: "Operator",
+        createdAt: createdAt.addingTimeInterval(3)
+    )
+    let accessSession = AccessSession(
+        deviceID: device.id,
+        accountID: account.id,
+        startedAt: createdAt.addingTimeInterval(4),
+        authenticationMethod: .localMock
+    )
+
+    try store.insertOrganization(organization)
+    try store.insertWorkspace(workspace)
+    try store.insertDevice(device)
+    try store.insertAccount(account)
+    try store.insertAccessSession(accessSession)
+
+    return SharedDeviceFixture(
+        organization: organization,
+        workspace: workspace,
+        device: device,
+        account: account,
+        accessSession: accessSession
+    )
+}
+
+func makeCaptureSession(
+    id: UUID,
+    fixture: SharedDeviceFixture,
+    startedAt: Date
+) -> CaptureSession {
+    CaptureSession(
+        id: id,
+        organizationID: fixture.organization.id,
+        workspaceID: fixture.workspace.id,
+        deviceID: fixture.device.id,
+        startedByAccountID: fixture.account.id,
+        accessSessionID: fixture.accessSession.id,
+        startedAt: startedAt
+    )
 }

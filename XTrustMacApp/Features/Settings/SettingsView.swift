@@ -6,8 +6,6 @@ struct SettingsView: View {
     let sessionCount: Int
     let errorMessage: String?
     let maintenanceMessage: String?
-    let isSummaryQueueBusy: Bool
-    let onRecoverStaleSummaries: () -> Void
     let onRefreshMlxServerStatus: () async -> Void
     let onStopMlxServer: () async -> Void
 
@@ -163,20 +161,14 @@ struct SettingsView: View {
                 XTSectionLabel(text: "Maintenance")
 
                 CopyableDetailRow(
-                    title: "Recovered Stale Summaries",
-                    value: String(diagnostics.recoveredStaleSummaryCount),
+                    title: "Recovered Minutes",
+                    value: String(diagnostics.recoveredMinutesCount),
                     showCopyButton: false
                 )
 
-                Text("起動時に前回中断された `running` 要約を自動で失敗扱いへ戻します。必要ならここから手動でも解除できます。")
+                Text("起動時に前回中断された議事録生成を自動で再開します。")
                     .font(XT.F.caption)
                     .foregroundStyle(XT.C.textSecondary)
-
-                Button(action: onRecoverStaleSummaries) {
-                    Label("Reset Stuck Summaries", systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(XTSecondaryButtonStyle())
-                .disabled(isSummaryQueueBusy)
 
                 if let maintenanceMessage {
                     Text(maintenanceMessage)

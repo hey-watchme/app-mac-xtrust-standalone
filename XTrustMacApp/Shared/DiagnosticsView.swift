@@ -45,14 +45,14 @@ struct DiagnosticsView: View {
                 value: diagnostics.activeAccessAccountDisplayName ?? "None"
             )
             CopyableDetailRow(
-                title: "Moonshine Model",
-                value: diagnostics.moonshineModelDirectory,
-                isMonospaced: true
-            )
-            CopyableDetailRow(
                 title: "Gemma 4 MLX Model",
                 value: diagnostics.mlxModelDirectory,
                 isMonospaced: true
+            )
+            CopyableDetailRow(
+                title: "Speech Locale",
+                value: diagnostics.speechAssetStatus?.localeIdentifier ?? "ja-JP",
+                showCopyButton: false
             )
             CopyableDetailRow(
                 title: "Memory Safety",
@@ -67,17 +67,22 @@ struct DiagnosticsView: View {
                 showCopyButton: false
             )
             CopyableDetailRow(
-                title: "Recovered Stale Summaries",
-                value: String(diagnostics.recoveredStaleSummaryCount),
+                title: "Recovered Minutes",
+                value: String(diagnostics.recoveredMinutesCount),
                 showCopyButton: false
             )
             CopyableDetailRow(title: "Session Count", value: String(sessionCount))
 
             statusRow("Audio Directory", isReady: diagnostics.audioReady)
-            statusRow("Transcript Directory", isReady: diagnostics.transcriptsReady)
-            statusRow("Summary Directory", isReady: diagnostics.summariesReady)
             statusRow("Models Directory", isReady: diagnostics.modelsReady)
-            statusRow("Moonshine Model Ready", isReady: diagnostics.moonshineModelReady)
+            statusRow(
+                "Speech Locale Supported",
+                isReady: diagnostics.speechAssetStatus?.localeSupported ?? false
+            )
+            statusRow(
+                "Speech Assets Installed",
+                isReady: diagnostics.speechAssetStatus?.localeInstalled ?? false
+            )
             statusRow("Gemma 4 MLX Ready", isReady: diagnostics.gemmaModelReady)
             statusRow("Database File", isReady: diagnostics.databaseReady)
             statusRow("Access Active", isReady: diagnostics.accessActive)

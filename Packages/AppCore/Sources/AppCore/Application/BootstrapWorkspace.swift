@@ -14,8 +14,6 @@ public struct BootstrapWorkspace: Sendable {
         try fileManager.createDirectory(at: paths.transcripts)
         try fileManager.createDirectory(at: paths.summaries)
         try fileManager.createDirectory(at: paths.models)
-        try fileManager.createDirectory(at: paths.jobs)
-        try fileManager.createDirectory(at: paths.transcriptionJobs)
         return paths
     }
 }

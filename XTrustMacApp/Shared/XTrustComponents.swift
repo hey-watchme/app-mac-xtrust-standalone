@@ -21,10 +21,10 @@ struct XTrustLogoView: View {
     }
 }
 
-// MARK: - Session Status Badge
+// MARK: - Capture Session Status Badge
 
-struct XTSessionStatusBadge: View {
-    let status: Session.Status
+struct XTCaptureStatusBadge: View {
+    let status: CaptureSession.Status
 
     var body: some View {
         Label(label, systemImage: icon)
@@ -38,62 +38,54 @@ struct XTSessionStatusBadge: View {
 
     private var label: String {
         switch status {
-        case .draft:     return "下書き"
+        case .open:      return "準備中"
         case .recording: return "録音中"
-        case .completed: return "完了"
-        case .failed:    return "エラー"
-        case .closed:    return "済"
+        case .closed:    return "終了"
         }
     }
 
     private var icon: String {
         switch status {
-        case .draft:     return "circle"
+        case .open:      return "circle"
         case .recording: return "record.circle.fill"
-        case .completed: return "checkmark.circle.fill"
-        case .failed:    return "exclamationmark.circle.fill"
         case .closed:    return "archivebox.fill"
         }
     }
 
     private var fg: Color {
         switch status {
-        case .draft:     return XT.C.textTertiary
+        case .open:      return XT.C.textTertiary
         case .recording: return XT.C.recording
-        case .completed: return XT.C.success
-        case .failed:    return XT.C.destructive
         case .closed:    return XT.C.textTertiary
         }
     }
 
     private var bg: Color {
         switch status {
-        case .draft:     return XT.C.textTertiary.opacity(0.08)
+        case .open:      return XT.C.textTertiary.opacity(0.08)
         case .recording: return XT.C.recordingBG
-        case .completed: return XT.C.successBG
-        case .failed:    return XT.C.recordingBG
         case .closed:    return XT.C.textTertiary.opacity(0.06)
         }
     }
 }
 
-// MARK: - Topic Summary Badge
+// MARK: - Meeting Minutes Badge
 
-struct XTTopicSummaryBadge: View {
-    let status: Topic.SummaryStatus
+struct XTMinutesBadge: View {
+    let status: MeetingMinutes.Status?
 
     var body: some View {
         switch status {
-        case .idle:
+        case nil:
             EmptyView()
-        case .running:
-            badge(text: "要約中", icon: "arrow.triangle.2.circlepath",
+        case .pending, .running:
+            badge(text: "議事録作成中", icon: "arrow.triangle.2.circlepath",
                   fg: XT.C.accent, bg: XT.C.accent.opacity(0.09))
         case .completed:
-            badge(text: "要約済", icon: "checkmark.circle.fill",
+            badge(text: "議事録", icon: "checkmark.circle.fill",
                   fg: XT.C.success, bg: XT.C.successBG)
         case .failed:
-            badge(text: "失敗", icon: "exclamationmark.circle",
+            badge(text: "議事録失敗", icon: "exclamationmark.circle",
                   fg: XT.C.destructive, bg: XT.C.recordingBG)
         }
     }

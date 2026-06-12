@@ -6,8 +6,6 @@ public struct WorkspacePaths: Equatable, Sendable {
     public let transcripts: URL
     public let summaries: URL
     public let models: URL
-    public let jobs: URL
-    public let transcriptionJobs: URL
     public let database: URL
 
     public init(root: URL) {
@@ -16,13 +14,7 @@ public struct WorkspacePaths: Equatable, Sendable {
         self.transcripts = root.appending(path: "transcripts", directoryHint: .isDirectory)
         self.summaries = root.appending(path: "summaries", directoryHint: .isDirectory)
         self.models = root.appending(path: "models", directoryHint: .isDirectory)
-        self.jobs = root.appending(path: "jobs", directoryHint: .isDirectory)
-        self.transcriptionJobs = jobs.appending(path: "transcription", directoryHint: .isDirectory)
         self.database = root.appendingPathComponent("xtrust-mac-local-first.sqlite")
-    }
-
-    public func transcriptionJobDirectory(jobID: UUID) -> URL {
-        transcriptionJobs.appending(path: jobID.uuidString, directoryHint: .isDirectory)
     }
 }
 

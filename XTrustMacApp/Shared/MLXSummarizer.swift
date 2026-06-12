@@ -71,11 +71,14 @@ struct MLXSummarizer: Summarizer, Sendable {
         try validatePromptSize(prompt)
 
         let turns = [MLXChatTurn(role: .user, text: prompt)]
+        let maxTokens = request.scope == .meetingMinutes
+            ? max(configuration.maxTokens, 1_024)
+            : configuration.maxTokens
 
         do {
             return try await server.chatCompletion(
                 messages: turns,
-                maxTokens: configuration.maxTokens
+                maxTokens: maxTokens
             )
         } catch let error as MLXModelServerError {
             throw map(error)
@@ -115,37 +118,38 @@ struct MLXSummarizer: Summarizer, Sendable {
         let outputFormat: String
 
         switch request.scope {
-        case .topic:
-            sourceLabel = "発話記録"
+        case .transcriptChunk:
+            sourceLabel = "文字起こしチャンク"
             taskInstruction = """
-            以下は会議中の1トピックに属する発話記録です。会話の言い換えではなく、業務で再利用できる実務メモとして整理してください。
+            以下は長い会議の文字起こしの一部です。後で会議全体の議事録に統合するための部分要約を作成してください。会話の言い換えではなく、業務で再利用できる実務メモとして整理してください。
             """
             outputFormat = """
-            **トピック**: この話題が何についての議論かを1文で
+            **この区間の論点**:
+            - 議論された話題を箇条書き
             **決定事項**:
-            - 決まったことを箇条書き
+            - この区間で決まったこと。なければ「なし」
             **未決事項**:
-            - 保留・確認待ち・論点だけ出て未決の項目
+            - 保留・確認待ち・論点だけ出て未決の項目。なければ「なし」
             **アクション**:
             - 次のステップ、担当、期限。聞き取れない場合は「要確認」と書く
-            **リスク・懸念**:
-            - ブロッカー、依存関係、懸念点。なければ「なし」
             """
-        case .meeting:
-            sourceLabel = "トピック要約"
+        case .meetingMinutes:
+            sourceLabel = "会議の文字起こし（または部分要約）"
             taskInstruction = """
-            以下は会議内の各トピック要約です。重複をまとめ、会議全体の流れと実務上の結論が分かる wrap-up を作ってください。
+            以下は会議の文字起こし（または部分要約）です。重複をまとめ、会議全体の流れと実務上の結論が分かる議事録を Markdown で作成してください。
             """
             outputFormat = """
-            **会議サマリー**: 会議全体の要旨を2〜3文で
-            **決定事項**:
+            ## 会議サマリー
+            会議全体の要旨を2〜3文で
+
+            ## 決定事項
             - 会議全体として確定した事項
-            **未決事項**:
+
+            ## 未決事項
             - 持ち越し、追加確認、判断保留
-            **アクション**:
+
+            ## アクションアイテム
             - 担当・期限付きで書けるものを優先。曖昧なら「要確認」
-            **フォローアップ観点**:
-            - 次回までに見落とすと危ない点や確認したい論点
             """
         }
 
@@ -185,7 +189,7 @@ struct MLXSummarizer: Summarizer, Sendable {
         }
     }
 
-    private func contextDescription(for profile: Session.MeetingContextProfile) -> String {
+    private func contextDescription(for profile: MeetingContextProfile) -> String {
         switch profile {
         case .general:
             return "一般的な仕事の会議。論点整理、決定事項、未決事項、次のアクションを重視する。"
@@ -198,7 +202,7 @@ struct MLXSummarizer: Summarizer, Sendable {
         }
     }
 
-    private func extractionPriorities(for profile: Session.MeetingContextProfile) -> String {
+    private func extractionPriorities(for profile: MeetingContextProfile) -> String {
         switch profile {
         case .general:
             return """

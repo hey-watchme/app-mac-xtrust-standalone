@@ -11,14 +11,14 @@ struct SerializedSummarizerTests {
 
         async let first = summarizer.summarize(
             request: SummarizationRequest(
-                scope: .topic,
+                scope: .transcriptChunk,
                 contextProfile: .general,
                 transcripts: ["first"]
             )
         )
         async let second = summarizer.summarize(
             request: SummarizationRequest(
-                scope: .meeting,
+                scope: .meetingMinutes,
                 contextProfile: .engineering,
                 transcripts: ["second"]
             )

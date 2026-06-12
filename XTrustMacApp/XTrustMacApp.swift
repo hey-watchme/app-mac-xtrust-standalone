@@ -1,17 +1,18 @@
+import Observation
 import SwiftUI
 
 @main
 struct XTrustMacApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var launchState = AppLaunchState()
+    @State private var launchModel = AppLaunchModel()
 
     var body: some Scene {
         WindowGroup {
             Group {
-                if let appState = launchState.appState {
-                    SessionListView(appState: appState)
+                if let model = launchModel.model {
+                    MeetingListView(model: model)
                 } else {
-                    AppLaunchErrorView(errorMessage: launchState.errorMessage)
+                    AppLaunchErrorView(errorMessage: launchModel.errorMessage)
                 }
             }
             .frame(minWidth: 1060, minHeight: 660)
@@ -20,16 +21,17 @@ struct XTrustMacApp: App {
 }
 
 @MainActor
-final class AppLaunchState: ObservableObject {
-    @Published var appState: AppState?
-    @Published var errorMessage: String?
+@Observable
+final class AppLaunchModel {
+    var model: AppModel?
+    var errorMessage: String?
 
     init() {
         do {
-            self.appState = try AppState.bootstrap()
+            self.model = try AppModel.bootstrap()
             self.errorMessage = nil
         } catch {
-            self.appState = nil
+            self.model = nil
             self.errorMessage = error.localizedDescription
         }
     }
