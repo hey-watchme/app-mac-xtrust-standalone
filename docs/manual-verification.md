@@ -62,8 +62,10 @@ screen shows current scope metadata.
 Steps:
 
 1. From the locked screen, begin access (`利用を開始`).
-2. Confirm the meeting UI becomes visible.
-3. In the left sidebar footer, press `Settings`.
+2. Confirm the Slack-style 4-column UI becomes visible (workspace rail,
+   dark navy sidebar, white transcript pane, AI Inspector).
+3. In the sidebar user strip (bottom-left), press the `···` button and select
+   `Settings`, or press the gear icon in the workspace rail.
 4. Confirm the settings screen shows:
    - organization
    - workspace
@@ -84,8 +86,9 @@ Goal: confirm leaving access returns the app to a neutral shared-device state.
 Steps:
 
 1. While access is active, run one meeting if needed.
-2. Press `退出` in the sidebar header.
-3. Confirm the app returns to the locked room-device screen.
+2. Press `退出` in the user strip at the bottom of the dark navy sidebar.
+3. Confirm the app returns to the locked room-device screen (dark navy with
+   XTRUST branding).
 4. Confirm the prior visible meeting list is no longer shown.
 
 Pass: logout resets the shared UI and returns to the locked screen.
@@ -142,12 +145,12 @@ durable finalized rows.
 Steps:
 
 1. While recording, speak a few sentences in Japanese.
-2. Confirm gray volatile (partial) text appears within about 1 second of
-   speaking.
-3. Confirm that when you pause, the volatile text is replaced by a finalized
-   transcript row with a `HH:MM:SS` timestamp.
-4. Speak again and confirm new finalized rows append in order; earlier rows
-   do not change.
+2. Confirm a typing-indicator row (animated dots + live caption text) appears
+   at the bottom of the transcript feed within about 1 second of speaking.
+3. Confirm that when you pause, the typing-indicator row is replaced by a
+   finalized transcript row (Slack message style) with a `HH:MM:SS` timestamp.
+4. Speak again and confirm new finalized rows append in order below the
+   typing indicator; earlier rows do not change.
 
 Pass: volatile text < 1 s, finalized rows are timestamped and stable.
 
@@ -158,12 +161,13 @@ recovers automatically on relaunch.
 
 Steps:
 
-1. After speaking enough content, press `会議を終了して議事録を作成`.
+1. After speaking enough content, press `会議を終了して議事録を作成` in the
+   ComposerBar at the bottom of the meeting pane.
 2. Confirm the meeting closes and minutes generation starts with a visible
-   progress state (`議事録を生成中…`).
+   progress state shown in the AI Inspector panel (要約 tab, right side).
 3. Confirm the completed minutes render in Japanese with the expected
-   sections (会議サマリー / 決定事項 / 未決事項 / アクションアイテム) and can
-   be copied / exported as Markdown together with the timestamped transcript.
+   sections (会議サマリー / 決定事項 / 未決事項 / アクションアイテム) in the
+   要約 tab, and can be copied / exported as Markdown.
 4. Run a second meeting, close it, and **force-quit the app (Cmd+Opt+Esc or
    `kill -9`) while minutes generation is still running**.
 5. Relaunch the app and begin access.
@@ -181,7 +185,8 @@ state.
 
 Steps:
 
-1. Open `Settings` -> `Diagnostics`.
+1. Open Settings via the gear icon in the workspace rail (or `···` in the
+   sidebar user strip), then navigate to `Diagnostics`.
 2. Confirm the speech rows are present:
    - `Speech Locale` (ja-JP)
    - `Speech Locale Supported`
@@ -201,9 +206,9 @@ Goal: confirm the shared-device privacy boundary after a full meeting cycle.
 Steps:
 
 1. Complete a meeting (Checks 4-6).
-2. Press `退出`.
-3. Confirm the app returns to the locked room-device screen and the prior
-   meeting content is not casually visible.
+2. Press `退出` in the sidebar user strip.
+3. Confirm the app returns to the locked room-device screen (dark navy) and
+   the prior meeting content is not casually visible.
 
 Pass: same as Check 2, verified after a real meeting cycle.
 
@@ -222,7 +227,9 @@ Background: subprocess isolation is still required (see
 
 Steps:
 
-1. Launch the app. Begin access. Open `Settings`.
+1. Launch the app. Begin access. Open Settings via the gear icon in the
+   workspace rail (or `···` in the sidebar user strip), then go to
+   `Diagnostics`.
 2. In the `Diagnostics` card, confirm the `MLX Server` section is visible.
    Initial state should be:
    - `State: Stopped`

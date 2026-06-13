@@ -203,20 +203,45 @@ mac-local-first/
 
 Core meeting flow (implemented and working):
 
-- locked shared-device screen -> begin local access -> `会議を開始`
-- capture state pill walks through: permission check -> speech asset check /
-  download -> starting -> `録音中`
-- live transcript: a gray volatile (partial) line plus timestamped finalized
-  rows; the UI is event-driven (`AsyncStream<CaptureEngineEvent>` consumed by
-  an `@Observable` `MeetingStore`) with no polling
+- locked shared-device screen (dark navy, XTRUST branding) -> begin local
+  access -> `会議を開始` in the main content pane
+- capture state pill in the header walks through: permission check -> speech
+  asset check / download -> starting -> `録音中` (REC badge with live
+  elapsed timer)
+- live transcript: Slack-style feed where volatile (partial) text appears as
+  a typing-indicator row at the bottom; each finalized utterance becomes a
+  timestamped message row; the UI is event-driven
+  (`AsyncStream<CaptureEngineEvent>` consumed by `MeetingStore`) with no
+  polling
 - `会議を終了して議事録を作成` -> Gemma 4 E4B (via the long-lived
-  `mlx_vlm.server`) generates Japanese meeting minutes (会議サマリー /
-  決定事項 / 未決事項 / アクションアイテム) -> copy / export as Markdown
+  `mlx_vlm.server`) generates Japanese meeting minutes -> result displayed in
+  the AI Insights Inspector (要約 tab); copy / export as Markdown
 - interrupted minutes generation auto-recovers on relaunch
   (`running` -> `pending`, then re-run automatically)
-- logout resets the shared UI and returns to the locked screen
+- AI chat: the **XTRUST AI** entry in the sidebar DM section opens the chat
+  panel backed by the same local Gemma 4 E4B model
+- logout (退出 in the sidebar user strip) resets the shared UI and returns to
+  the locked screen
 
 Key components:
+
+UI shell (`XTrustMacApp/Features/Shell/`):
+
+- `WorkspaceRail`: decorative 60 px left rail with XTRUST logo and workspace
+  tiles (placeholder workspaces for vision presentation)
+- `SlackSidebar`: 264 px dark navy sidebar — mode switch (会議 / 資料),
+  search, main nav, DEALS / PORTFOLIO channel groups, DM list (including
+  XTRUST AI chat entry), user strip with 退出
+- `SlackMeetingView`: main content column with `MeetingHeader` (breadcrumb,
+  title, REC badge, status pills, stacked participant avatars), Slack-style
+  transcript feed (`SlackTranscriptRow` for real utterances, `DemoTranscriptRow`
+  for idle/demo state), `ComposerBar` (record start/stop, waveform driven by
+  `audioLevel`, volatile caption, elapsed timer)
+- `AIInspector`: 384 px collapsible right panel — 要約 tab shows real
+  `MeetingMinutes` content; 決定 / アクション / リスク / ナレッジ tabs are
+  placeholder cards for vision presentation
+
+Core services (unchanged):
 
 - `SpeechAnalyzerCaptureEngine` (app target, `XTrustMacApp/Capture/`):
   microphone capture, on-device streaming ASR, audio level metering, and one
@@ -228,13 +253,11 @@ Key components:
 - `MLXModelServer` / `MLXSummarizer` / `MLXChatRunner`: local LLM runtime as
   a long-lived `mlx_vlm.server` subprocess with idle teardown and
   memory-pressure kill (see `docs/llm-server-residency.md`)
-- chat panel (**チャット** in the sidebar) backed by the same local Gemma 4
-  E4B model
-- `Diagnostics`: speech asset status (ja-JP supported / installed), Gemma 4
-  model readiness, MLX server state, recovered minutes count, and current
-  organization / workspace / device / access scope
-- UI design system (`XT` token namespace, custom components) — see
-  `docs/design-system.md`
+- `Diagnostics`: speech asset status, Gemma 4 model readiness, MLX server
+  state, recovered minutes count, and current organization / workspace /
+  device / access scope
+- UI design system (`XT` token namespace extended with Slack-style palette) —
+  see `docs/design-system.md`
 
 Verification:
 
